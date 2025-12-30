@@ -756,17 +756,19 @@ status-pill {
     border-radius: 6px;
     margin: 0 auto;
     width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   table {
     font-size: 0.75rem;
-    min-width: 550px;
+    min-width: 100%;
     width: 100%;
-    margin: 0 auto;
   }
 
-  th, td {
-    padding: 0.4rem 0.3rem;
+  thead th {
+    padding: 0.6rem 0.3rem;
+    font-size: 0.7rem;
   }
 
   th {
@@ -1363,11 +1365,23 @@ button.primary {
     border-radius: 4px;
     margin: 0 -0.5rem;
     border: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   table {
     font-size: 0.7rem;
-    min-width: 500px;
+    min-width: 100%;
+    width: 100%;
+  }
+
+  thead th {
+    padding: 0.5rem 0.25rem;
+    font-size: 0.65rem;
+  }
+
+  tbody td {
+    padding: 0.5rem 0.25rem;
   }
 
   th, td {
