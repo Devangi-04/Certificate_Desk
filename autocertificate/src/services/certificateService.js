@@ -309,8 +309,21 @@ async function sendCertificateById(certificateId, options = {}) {
   return { certificateId, status: 'sent' };
 }
 
+async function getCertificateById(certificateId) {
+  const [certificate] = await query(
+    `SELECT c.*, p.full_name, p.email, t.original_name as template_name
+     FROM certificates c
+     JOIN participants p ON c.participant_id = p.id
+     JOIN templates t ON c.template_id = t.id
+     WHERE c.id = $1`,
+    [certificateId]
+  );
+  return certificate;
+}
+
 module.exports = {
   listCertificates,
   generateCertificates,
   sendCertificateById,
+  getCertificateById,
 };
