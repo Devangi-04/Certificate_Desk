@@ -86,7 +86,9 @@ async function getCertificatesExcel(req, res) {
     ];
   });
 
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+  // Combine headers and rows for proper Excel export
+  const worksheetData = [headers, ...rows];
+  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Certificates');
 
