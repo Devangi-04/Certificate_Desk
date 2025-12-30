@@ -134,7 +134,7 @@ function renderCertificates(certificates = []) {
   certTableEl.innerHTML = certificates
     .map((c) => {
       const pdfLink = c.pdf_path
-        ? `<a href="/${c.pdf_path}" target="_blank">Download</a>`
+        ? `<a href="/api/certificates/${c.id}/download" target="_blank">Download</a>`
         : '<span>—</span>';
       return `
         <tr>
