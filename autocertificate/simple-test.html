@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Position Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-area { 
+            width: 600px; 
+            height: 400px; 
+            border: 2px solid #000; 
+            position: relative; 
+            background: #f0f0f0;
+        }
+        .text-element {
+            position: absolute;
+            font: bold 36px Helvetica, Arial, sans-serif;
+            color: #000;
+        }
+        .coordinates {
+            margin: 10px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Position Test</h1>
+    
+    <div class="coordinates">
+        <strong>Test Case: Center Position (X=0.5, Y=0.5)</strong><br>
+        Canvas: 600x400px<br>
+        Expected: X=300px, Y=200px (from top-left)<br>
+        <span id="actual"></span>
+    </div>
+    
+    <div class="test-area" id="testArea">
+        <div class="text-element" id="textElement">John Doe</div>
+    </div>
+
+    <script>
+        const testArea = document.getElementById('testArea');
+        const textElement = document.getElementById('textElement');
+        const actual = document.getElementById('actual');
+        
+        // Test parameters
+        const canvasWidth = 600;
+        const canvasHeight = 400;
+        const placementX = 0.5; // Center X
+        const placementY = 0.5; // Center Y
+        
+        // Simulate frontend positioning logic
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = 'bold 36px Helvetica, Arial, sans-serif';
+        const textWidth = ctx.measureText('John Doe').width;
+        const textHeight = 36 * 1.2;
+        
+        // Apply same logic as frontend
+        let anchorX = placementX * canvasWidth;
+        let anchorY = placementY * canvasHeight;
+        anchorX -= (textWidth * 0.98) / 2; // Apply compensation
+        
+        // Convert PDF Y to canvas Y
+        const canvasY = canvasHeight - anchorY;
+        const anchorYTop = canvasY - textHeight;
+        
+        // Position the element
+        textElement.style.left = anchorX + 'px';
+        textElement.style.top = anchorYTop + 'px';
+        
+        // Show results
+        actual.innerHTML = `
+            <strong>Actual Calculation:</strong><br>
+            Text Width: ${textWidth}px (compensated: ${textWidth * 0.98}px)<br>
+            Anchor X: ${anchorX}px<br>
+            Anchor Y: ${anchorY}px (from bottom)<br>
+            Canvas Y: ${canvasY}px (from top)<br>
+            Final Position: X=${anchorX}px, Y=${anchorYTop}px
+        `;
+        
+        console.log('Position test results:', {
+            textWidth,
+            anchorX,
+            anchorY,
+            canvasY,
+            anchorYTop,
+            finalPosition: { x: anchorX, y: anchorYTop }
+        });
+    </script>
+</body>
+</html>

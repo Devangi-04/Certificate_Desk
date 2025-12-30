@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Coordinate System Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        canvas { border: 1px solid #000; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Coordinate System Test</h1>
+    
+    <div class="test">
+        <h3>Canvas Coordinates (Y=0 at top)</h3>
+        <canvas id="testCanvas" width="400" height="200"></canvas>
+        <p>Canvas dimensions: 400x200</p>
+        <p>Test position: X=0.5 (50%), Y=0.5 (50%)</p>
+        <p>Expected canvas position: X=200, Y=100</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Draw some content
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, 400, 200);
+        
+        // Test position: X=0.5, Y=0.5
+        const testX = 0.5 * canvas.width;  // 200
+        const testY = 0.5 * canvas.height; // 100
+        
+        // Draw a marker at this position
+        ctx.fillStyle = 'red';
+        ctx.fillRect(testX - 5, testY - 5, 10, 10);
+        
+        // Add text
+        ctx.fillStyle = 'black';
+        ctx.font = '20px Arial';
+        ctx.fillText('Test Position (200, 100)', testX + 10, testY);
+        
+        console.log('Canvas test:', {
+            width: canvas.width,
+            height: canvas.height,
+            testX,
+            testY
+        });
+    </script>
+</body>
+</html>

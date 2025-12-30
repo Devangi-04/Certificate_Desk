@@ -1,0 +1,8 @@
+node_modules
+.env
+storage/templates/*
+storage/data/*
+storage/generated/*
+!storage/templates/.gitkeep
+!storage/data/.gitkeep
+!storage/generated/.gitkeep
