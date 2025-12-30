@@ -2,6 +2,7 @@ const {
   listCertificates,
   generateCertificates,
   sendCertificateById,
+  getCertificateById,
 } = require('../services/certificateService');
 const XLSX = require('xlsx');
 const { success } = require('../utils/response');
@@ -143,10 +144,32 @@ async function getCertificatesCsv(req, res) {
   return res.send(csvContent);
 }
 
+async function downloadCertificate(req, res) {
+  const { certificateId } = req.params;
+  const certificate = await getCertificateById(certificateId);
+  
+  if (!certificate || !certificate.pdf_path) {
+    const error = new Error('Certificate PDF not found');
+    error.status = 404;
+    throw error;
+  }
+
+  const { readFromStorage } = require('../utils/fileStorage');
+  const pdfBuffer = await readFromStorage(certificate.pdf_path);
+  
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="certificate-${certificateId}.pdf"`
+  );
+  return res.send(pdfBuffer);
+}
+
 module.exports = {
   getCertificates,
   postGenerateCertificates,
   postSendCertificate,
   getCertificatesCsv,
   getCertificatesExcel,
+  downloadCertificate,
 };
