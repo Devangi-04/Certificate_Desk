@@ -585,6 +585,8 @@ status-pill {
   .item-actions button {
     width: 100%;
     max-width: 300px;
+    margin: 0 auto;
+    display: block;
   }
 
   .pill {
@@ -795,11 +797,15 @@ status-pill {
     padding: 0.75rem 1rem;
     font-size: 0.9rem;
     max-width: 300px;
+    margin: 0 auto;
+    display: block;
   }
 
   .ghost {
     padding: 0.6rem 1rem;
     font-size: 0.85rem;
+    margin: 0 auto;
+    display: block;
   }
 
   .dropzone {
