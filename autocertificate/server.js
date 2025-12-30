@@ -29,6 +29,10 @@ app.use('/api', apiRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Certificate automation server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Certificate automation server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;

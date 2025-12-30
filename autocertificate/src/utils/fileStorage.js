@@ -11,8 +11,14 @@ const STORAGE_DIRECTORIES = {
   generated: path.join(STORAGE_ROOT, 'generated'),
 };
 
-const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
-const USE_BLOB_STORAGE = Boolean(BLOB_TOKEN);
+function getBlobToken() {
+  const token = process.env['BLOB_READ_WRITE_TOKEN'];
+  return typeof token === 'string' ? token.trim() : '';
+}
+
+function useBlobStorage() {
+  return Boolean(getBlobToken());
+}
 
 let blobModulePromise;
 async function getBlobModule() {
@@ -29,7 +35,7 @@ function ensureDirectorySync(dirPath) {
 }
 
 function ensureStorageDirectories() {
-  if (USE_BLOB_STORAGE) {
+  if (useBlobStorage()) {
     return;
   }
   ensureDirectorySync(STORAGE_ROOT);
@@ -53,12 +59,13 @@ function buildFileName(dirKey, extension = '', customName = '') {
 }
 
 async function saveBufferToStorage(buffer, dirKey, extension = '', customName = '', options = {}) {
-  if (USE_BLOB_STORAGE) {
+  if (useBlobStorage()) {
     const { put } = await getBlobModule();
     const blobPath = buildFileName(dirKey, extension, customName);
+    const blobToken = getBlobToken();
     const result = await put(blobPath, buffer, {
       access: 'public',
-      token: BLOB_TOKEN,
+      token: blobToken,
       contentType: options.contentType || 'application/octet-stream',
     });
 
@@ -97,9 +104,9 @@ function resolveFromRoot(relativePath) {
 async function deleteFromStorage(storedPath) {
   if (!storedPath) return;
   if (storedPath.startsWith('http://') || storedPath.startsWith('https://')) {
-    if (!USE_BLOB_STORAGE) return;
+    if (!useBlobStorage()) return;
     const { del } = await getBlobModule();
-    await del(storedPath, { token: BLOB_TOKEN }).catch(() => null);
+    await del(storedPath, { token: getBlobToken() }).catch(() => null);
     return;
   }
 
@@ -133,5 +140,5 @@ module.exports = {
   readFromStorage,
   STORAGE_ROOT,
   ROOT_DIR,
-  USE_BLOB_STORAGE,
+  useBlobStorage,
 };
