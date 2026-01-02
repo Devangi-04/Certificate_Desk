@@ -199,9 +199,11 @@ async function deleteParticipant(participantId) {
 
 function updateDeleteSelectedButton() {
   const selectedCount = document.querySelectorAll('.participant-checkbox:checked').length;
+  const totalCount = document.querySelectorAll('.participant-checkbox').length;
+  
   if (deleteSelectedBtn) {
     deleteSelectedBtn.style.display = selectedCount > 0 ? 'inline-block' : 'none';
-    deleteSelectedBtn.textContent = `Delete Selected (${selectedCount})`;
+    deleteSelectedBtn.textContent = `Delete Selected Only (${selectedCount}/${totalCount})`;
   }
 }
 
@@ -217,7 +219,8 @@ async function deleteSelectedParticipants() {
     return;
   }
   
-  if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected participants? This action cannot be undone.`)) {
+  // More specific confirmation for selected participants
+  if (!confirm(`Delete only the ${selectedIds.length} selected participants?\n\nThis will remove:\n• ${selectedIds.length} selected participant(s)\n• 0 unselected participant(s)\n\nThis action cannot be undone.`)) {
     return;
   }
   
@@ -226,7 +229,7 @@ async function deleteSelectedParticipants() {
       method: 'POST',
       body: JSON.stringify({ participantIds: selectedIds })
     });
-    showToast(`Successfully deleted ${result.deletedCount} participants`);
+    showToast(`Successfully deleted ${result.deletedCount} selected participants`);
     await loadParticipants();
   } catch (err) {
     showToast(err.message || 'Failed to delete selected participants', 'error');
@@ -250,8 +253,8 @@ async function clearAllParticipants() {
     return;
   }
   
-  // First confirmation
-  const confirmMessage = `⚠️ WARNING: You are about to delete ALL ${domParticipantCount} participants!\n\nThis action CANNOT be undone.\n\nClick "OK" to DELETE ALL participants\nClick "Cancel" to keep them`;
+  // First confirmation - very clear this is ALL participants
+  const confirmMessage = `🚨 DELETE ALL PARTICIPANTS 🚨\n\nYou are about to delete ALL ${domParticipantCount} participants in the system!\n\nThis includes:\n• ${domParticipantCount} total participant(s)\n• Both selected AND unselected\n\n⚠️ This action CANNOT be undone!\n\nClick "OK" to DELETE ALL PARTICIPANTS\nClick "Cancel" to keep them`;
   
   if (!confirm(confirmMessage)) {
     showToast('Participant deletion cancelled - no participants were removed', 'info');
