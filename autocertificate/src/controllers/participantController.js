@@ -4,6 +4,8 @@ const {
   createParticipant,
   updateParticipant,
   deleteParticipant,
+  deleteAllParticipants,
+  deleteParticipantsByIds,
 } = require('../services/participantService');
 const { success } = require('../utils/response');
 
@@ -44,10 +46,26 @@ async function deleteParticipantHandler(req, res) {
   return success(res, result);
 }
 
+async function deleteAllParticipantsHandler(req, res) {
+  const result = await deleteAllParticipants();
+  return success(res, result);
+}
+
+async function deleteParticipantsHandler(req, res) {
+  const { participantIds } = req.body || {};
+  if (!participantIds || !Array.isArray(participantIds)) {
+    throw new Error('participantIds array is required');
+  }
+  const result = await deleteParticipantsByIds(participantIds);
+  return success(res, result);
+}
+
 module.exports = {
   importParticipants,
   getParticipants,
   createParticipant: createParticipantHandler,
   updateParticipant: updateParticipantHandler,
   deleteParticipant: deleteParticipantHandler,
+  deleteAllParticipants: deleteAllParticipantsHandler,
+  deleteParticipants: deleteParticipantsHandler,
 };

@@ -60,7 +60,11 @@
               <h2>Participant Import</h2>
               <p>Upload XLSX/CSV exported from your Google Sheet to update the roster.</p>
             </div>
-            <button class="ghost" id="refresh-participants">Refresh</button>
+            <div class="panel-actions">
+              <button class="ghost danger" id="clear-participants">Clear All Participants</button>
+              <button class="ghost danger" id="delete-selected" style="display: none;">Delete Selected</button>
+              <button class="ghost" id="refresh-participants">Refresh</button>
+            </div>
           </header>
           <form id="participant-form" class="dropzone">
             <label class="file-label">
@@ -69,6 +73,12 @@
             </label>
             <button type="submit">Import Participants</button>
           </form>
+          <div class="participant-controls">
+            <label class="checkbox">
+              <input type="checkbox" id="select-all-participants" />
+              <span>Select All</span>
+            </label>
+          </div>
           <div class="list" id="participant-list"></div>
         </section>
 

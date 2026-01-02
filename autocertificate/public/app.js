@@ -32,6 +32,9 @@ const generateForm = document.getElementById('generate-form');
 
 const refreshTemplatesBtn = document.getElementById('refresh-templates');
 const refreshParticipantsBtn = document.getElementById('refresh-participants');
+const clearParticipantsBtn = document.getElementById('clear-participants');
+const deleteSelectedBtn = document.getElementById('delete-selected');
+const selectAllParticipantsCheckbox = document.getElementById('select-all-participants');
 const refreshCertificatesBtn = document.getElementById('refresh-certificates');
 const exportCertificatesBtn = document.getElementById('export-certificates');
 const exportExcelBtn = document.getElementById('export-excel');
@@ -114,7 +117,8 @@ function renderParticipants(participants = []) {
     .slice(0, 12)
     .map(
       (p) => `
-        <div class="pill">
+        <div class="pill" data-id="${p.id}">
+          <input type="checkbox" class="participant-checkbox" data-id="${p.id}" />
           <span class="pill-name">${p.full_name}</span>
           <span class="pill-email">${p.email}</span>
           <button class="pill-delete" onclick="deleteParticipant(${p.id})" title="Delete participant">×</button>
@@ -127,6 +131,8 @@ function renderParticipants(participants = []) {
   participantSelectEl.innerHTML = participants
     .map((p) => `<option value="${p.id}">${p.full_name} — ${p.email}</option>`)
     .join('');
+  
+  updateDeleteSelectedButton();
 }
 
 function renderCertificates(certificates = []) {
@@ -188,6 +194,71 @@ async function deleteParticipant(participantId) {
     await loadParticipants();
   } catch (err) {
     showToast(err.message || 'Failed to delete participant', 'error');
+  }
+}
+
+function updateDeleteSelectedButton() {
+  const selectedCount = document.querySelectorAll('.participant-checkbox:checked').length;
+  if (deleteSelectedBtn) {
+    deleteSelectedBtn.style.display = selectedCount > 0 ? 'inline-block' : 'none';
+    deleteSelectedBtn.textContent = `Delete Selected (${selectedCount})`;
+  }
+}
+
+function getSelectedParticipantIds() {
+  const checkboxes = document.querySelectorAll('.participant-checkbox:checked');
+  return Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+}
+
+async function deleteSelectedParticipants() {
+  const selectedIds = getSelectedParticipantIds();
+  if (selectedIds.length === 0) {
+    showToast('No participants selected', 'info');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected participants? This action cannot be undone.`)) {
+    return;
+  }
+  
+  try {
+    const result = await fetchJSON('/participants/delete', {
+      method: 'POST',
+      body: JSON.stringify({ participantIds: selectedIds })
+    });
+    showToast(`Successfully deleted ${result.deletedCount} participants`);
+    await loadParticipants();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete selected participants', 'error');
+  }
+}
+
+function toggleSelectAllParticipants() {
+  const isChecked = selectAllParticipantsCheckbox.checked;
+  const checkboxes = document.querySelectorAll('.participant-checkbox');
+  checkboxes.forEach(cb => cb.checked = isChecked);
+  updateDeleteSelectedButton();
+}
+
+async function clearAllParticipants() {
+  const participantCount = participantListEl.querySelectorAll('.pill').length;
+  if (participantCount === 0) {
+    showToast('No participants to delete', 'info');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to delete all ${participantCount} participants? This action cannot be undone.`)) {
+    return;
+  }
+  
+  try {
+    const result = await fetchJSON('/participants/all', {
+      method: 'DELETE'
+    });
+    showToast(`Successfully deleted ${result.deletedCount} participants`);
+    await loadParticipants();
+  } catch (err) {
+    showToast(err.message || 'Failed to clear participants', 'error');
   }
 }
 
@@ -280,8 +351,19 @@ if (generateForm) {
   });
 }
 
+if (participantListEl) {
+  participantListEl.addEventListener('click', (event) => {
+    if (event.target.classList.contains('participant-checkbox')) {
+      updateDeleteSelectedButton();
+    }
+  });
+}
+
 if (refreshTemplatesBtn) refreshTemplatesBtn.addEventListener('click', loadTemplates);
 if (refreshParticipantsBtn) refreshParticipantsBtn.addEventListener('click', loadParticipants);
+if (clearParticipantsBtn) clearParticipantsBtn.addEventListener('click', clearAllParticipants);
+if (deleteSelectedBtn) deleteSelectedBtn.addEventListener('click', deleteSelectedParticipants);
+if (selectAllParticipantsCheckbox) selectAllParticipantsCheckbox.addEventListener('change', toggleSelectAllParticipants);
 if (refreshCertificatesBtn) refreshCertificatesBtn.addEventListener('click', loadCertificates);
 if (exportCertificatesBtn)
   exportCertificatesBtn.addEventListener('click', async () => {

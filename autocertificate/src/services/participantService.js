@@ -250,6 +250,17 @@ async function deleteParticipant(participantId) {
   return { id: participantId };
 }
 
+async function deleteAllParticipants() {
+  const result = await query('DELETE FROM participants');
+  return { deletedCount: result.rowCount || 0 };
+}
+
+async function deleteParticipantsByIds(participantIds = []) {
+  if (!participantIds.length) return { deletedCount: 0 };
+  const result = await query('DELETE FROM participants WHERE id = ANY($1::bigint[])', [participantIds]);
+  return { deletedCount: result.rowCount || 0 };
+}
+
 module.exports = {
   importParticipantsFromWorkbook,
   listParticipants,
@@ -257,4 +268,6 @@ module.exports = {
   createParticipant,
   updateParticipant,
   deleteParticipant,
+  deleteAllParticipants,
+  deleteParticipantsByIds,
 };
