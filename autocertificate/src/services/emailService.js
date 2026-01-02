@@ -13,8 +13,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Rate limiting for Brevo SMTP (300 emails/day)
-const EMAIL_DELAY_MS = 2000; // 2 seconds between emails (30 emails/minute, extra safe for Brevo)
+// Rate limiting for Gmail SMTP (100 emails/day)
+const EMAIL_DELAY_MS = 6000; // 6 seconds between emails (10 emails/minute, safe for Gmail)
 let lastEmailSent = 0;
 
 async function delayEmailSending() {
