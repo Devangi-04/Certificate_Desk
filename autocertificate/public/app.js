@@ -256,6 +256,7 @@ if (generateForm) {
       participantIds: participantIds.map(Number),
       sendEmail: formData.get('sendEmail') === 'on',
       eventName: formData.get('eventName')?.trim() || undefined,
+      deleteParticipantsAfterSending: formData.get('deleteParticipantsAfterSending') === 'on',
     };
     try {
       generationLogEl.textContent = 'Running generation...\n';
@@ -264,8 +265,14 @@ if (generateForm) {
         body: JSON.stringify(payload),
       });
       generationLogEl.textContent += JSON.stringify(summary, null, 2);
-      showToast('Certificates generated successfully');
+      const message = summary.deleted > 0 
+        ? `Certificates generated successfully. ${summary.deleted} participants removed from the list.`
+        : 'Certificates generated successfully';
+      showToast(message);
       await loadCertificates();
+      if (summary.deleted > 0) {
+        await loadParticipants(); // Refresh participant list if any were deleted
+      }
     } catch (err) {
       generationLogEl.textContent += `Error: ${err.message}`;
       showToast(err.message, 'error');
@@ -377,11 +384,27 @@ if (certTableEl) {
     const target = event.target.closest('button[data-action="resend"]');
     if (!target) return;
     const certId = target.dataset.id;
+    
+    // Ask user if they want to delete the participant after resending
+    const deleteParticipant = confirm('Do you want to remove this participant from the list after resending the certificate?\n\nOK = Remove participant\nCancel = Keep participant');
+    
     target.disabled = true;
     try {
-      await fetchJSON(`/certificates/${certId}/send`, { method: 'POST', body: JSON.stringify({}) });
-      showToast('Certificate resent successfully');
+      const payload = deleteParticipant ? { deleteParticipantAfterSending: true } : {};
+      const result = await fetchJSON(`/certificates/${certId}/send`, { 
+        method: 'POST', 
+        body: JSON.stringify(payload) 
+      });
+      
+      const message = result.participantDeleted 
+        ? 'Certificate resent and participant removed successfully'
+        : 'Certificate resent successfully';
+      showToast(message);
+      
       await loadCertificates();
+      if (result.participantDeleted) {
+        await loadParticipants(); // Refresh participant list if participant was deleted
+      }
     } catch (err) {
       showToast(err.message, 'error');
       target.disabled = false;
