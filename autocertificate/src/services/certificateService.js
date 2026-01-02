@@ -5,7 +5,7 @@ const {
   readFromStorage,
 } = require('../utils/fileStorage');
 const { getTemplateById } = require('./templateService');
-const { listParticipants, getParticipantsByIds, deleteParticipant } = require('./participantService');
+const { listParticipants, getParticipantsByIds } = require('./participantService');
 const { sendCertificateEmail } = require('./emailService');
 
 function parseColor(hex = '#000000') {
@@ -105,7 +105,7 @@ async function listCertificates() {
   );
 }
 
-async function generateCertificates({ templateId, participantIds = [], sendEmail = false, eventName, deleteParticipantsAfterSending = false }) {
+async function generateCertificates({ templateId, participantIds = [], sendEmail = false, eventName }) {
   if (!templateId) {
     throw new Error('templateId is required');
   }
@@ -146,7 +146,6 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
     total: participants.length,
     generated: 0,
     emailed: 0,
-    deleted: 0,
     failures: [],
   };
 
@@ -270,20 +269,6 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
           [certificateRecord.id]
         );
         summary.emailed += 1;
-        
-        // Delete participant after successful email sending if requested
-        if (deleteParticipantsAfterSending) {
-          try {
-            await deleteParticipant(participant.id);
-            summary.deleted += 1;
-          } catch (deleteErr) {
-            console.error(`Failed to delete participant ${participant.id}:`, deleteErr);
-            summary.failures.push({ 
-              participantId: participant.id, 
-              message: `Certificate sent but failed to delete participant: ${deleteErr.message}` 
-            });
-          }
-        }
       }
     } catch (err) {
       console.error('Certificate generation failed', err);
@@ -321,22 +306,6 @@ async function sendCertificateById(certificateId, options = {}) {
      WHERE id = $1`,
     [certificateId]
   );
-  
-  // Delete participant after successful email sending if requested
-  if (options.deleteParticipantAfterSending) {
-    try {
-      await deleteParticipant(participant.id);
-      return { certificateId, status: 'sent', participantDeleted: true };
-    } catch (deleteErr) {
-      console.error(`Failed to delete participant ${participant.id}:`, deleteErr);
-      return { 
-        certificateId, 
-        status: 'sent', 
-        participantDeleted: false,
-        deleteError: deleteErr.message 
-      };
-    }
-  }
   
   return { certificateId, status: 'sent' };
 }

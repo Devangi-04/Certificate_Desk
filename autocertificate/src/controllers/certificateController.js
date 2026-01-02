@@ -35,7 +35,7 @@ async function getCertificates(req, res) {
 }
 
 async function postGenerateCertificates(req, res) {
-  const { templateId, participantIds = [], sendEmail = false, eventName, deleteParticipantsAfterSending = false } = req.body || {};
+  const { templateId, participantIds = [], sendEmail = false, eventName } = req.body || {};
   if (!templateId) {
     throw new Error('templateId is required');
   }
@@ -44,7 +44,6 @@ async function postGenerateCertificates(req, res) {
     participantIds,
     sendEmail,
     eventName,
-    deleteParticipantsAfterSending,
   });
   return success(res, summary, 201);
 }
