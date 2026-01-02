@@ -295,13 +295,24 @@ async function deleteParticipant(participantId) {
 }
 
 async function deleteAllParticipants() {
+  console.log('deleteAllParticipants called');
+  
   // Get count before deletion
   const countResult = await query('SELECT COUNT(*) as count FROM participants');
   const deletedCount = countResult[0]?.count || 0;
   
-  // Delete all participants
-  await query('DELETE FROM participants');
+  console.log('Participants to delete:', deletedCount);
   
+  if (deletedCount === 0) {
+    console.log('No participants to delete');
+    return { deletedCount: 0 };
+  }
+  
+  // Delete all participants
+  const deleteResult = await query('DELETE FROM participants');
+  console.log('Delete query result:', deleteResult);
+  
+  console.log('Deleted', deletedCount, 'participants');
   return { deletedCount };
 }
 

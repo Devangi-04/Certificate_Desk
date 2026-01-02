@@ -241,23 +241,49 @@ function toggleSelectAllParticipants() {
 }
 
 async function clearAllParticipants() {
-  const participantCount = participantListEl.querySelectorAll('.pill').length;
-  if (participantCount === 0) {
+  // Get count from DOM first
+  const domParticipantCount = participantListEl.querySelectorAll('.pill').length;
+  console.log('DOM participant count:', domParticipantCount);
+  
+  if (domParticipantCount === 0) {
     showToast('No participants to delete', 'info');
     return;
   }
   
-  if (!confirm(`Are you sure you want to delete all ${participantCount} participants? This action cannot be undone.`)) {
+  // First confirmation
+  const confirmMessage = `⚠️ WARNING: You are about to delete ALL ${domParticipantCount} participants!\n\nThis action CANNOT be undone.\n\nClick "OK" to DELETE ALL participants\nClick "Cancel" to keep them`;
+  
+  if (!confirm(confirmMessage)) {
+    showToast('Participant deletion cancelled - no participants were removed', 'info');
+    return;
+  }
+  
+  // Second confirmation for extra safety
+  const secondConfirm = `🚨 FINAL CONFIRMATION 🚨\n\nAre you ABSOLUTELY SURE you want to delete all ${domParticipantCount} participants?\n\nClick "OK" to proceed, "Cancel" to abort)`;
+  
+  if (!confirm(secondConfirm)) {
+    showToast('Participant deletion cancelled - no participants were removed', 'info');
     return;
   }
   
   try {
+    console.log('Sending delete request to server...');
     const result = await fetchJSON('/participants/all', {
       method: 'DELETE'
     });
-    showToast(`Successfully deleted ${result.deletedCount} participants`);
+    
+    console.log('Delete result:', result);
+    
+    if (result.deletedCount === 0) {
+      showToast('No participants were deleted. They may have been already removed.', 'warning');
+    } else {
+      showToast(`Successfully deleted ${result.deletedCount} participants`);
+    }
+    
+    // Always refresh the list to show current state
     await loadParticipants();
   } catch (err) {
+    console.error('Delete error:', err);
     showToast(err.message || 'Failed to clear participants', 'error');
   }
 }
@@ -379,7 +405,14 @@ if (participantListEl) {
 
 if (refreshTemplatesBtn) refreshTemplatesBtn.addEventListener('click', loadTemplates);
 if (refreshParticipantsBtn) refreshParticipantsBtn.addEventListener('click', loadParticipants);
-if (clearParticipantsBtn) clearParticipantsBtn.addEventListener('click', clearAllParticipants);
+if (clearParticipantsBtn) {
+  clearParticipantsBtn.addEventListener('click', async (event) => {
+    console.log('Clear participants button clicked'); // Debug log
+    event.preventDefault(); // Prevent any default behavior
+    event.stopPropagation(); // Stop event bubbling
+    await clearAllParticipants();
+  });
+}
 if (deleteSelectedBtn) deleteSelectedBtn.addEventListener('click', deleteSelectedParticipants);
 if (selectAllParticipantsCheckbox) selectAllParticipantsCheckbox.addEventListener('change', toggleSelectAllParticipants);
 if (refreshCertificatesBtn) refreshCertificatesBtn.addEventListener('click', loadCertificates);
