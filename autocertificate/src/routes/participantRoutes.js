@@ -12,8 +12,8 @@ const router = express.Router();
 
 router.get('/', getParticipants);
 router.post('/import', upload.single('sheet'), importParticipants);
-router.delete('/:participantId', deleteParticipant);
 router.delete('/all', deleteAllParticipants);
 router.post('/delete', deleteParticipants);
+router.delete('/:participantId', deleteParticipant);
 
 module.exports = router;
