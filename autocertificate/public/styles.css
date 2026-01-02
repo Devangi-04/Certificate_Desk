@@ -528,6 +528,48 @@ status-pill {
     max-width: 300px;
   }
 
+  /* Grid form mobile optimizations */
+  .grid-form {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .grid-form label {
+    font-size: 0.9rem;
+  }
+
+  .grid-form select,
+  .grid-form input,
+  .grid-form textarea {
+    padding: 0.875rem;
+    font-size: 0.95rem;
+    min-height: 44px; /* Touch-friendly height */
+  }
+
+  .grid-form select[multiple] {
+    min-height: 120px;
+  }
+
+  /* Checkbox mobile optimizations */
+  .checkbox {
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin: 0.25rem 0;
+  }
+
+  .checkbox input[type="checkbox"] {
+    min-width: 20px;
+    min-height: 20px;
+    transform: scale(1.2);
+  }
+
+  .checkbox span {
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
   /* Certificate table mobile optimizations */
   .table-wrapper {
     overflow-x: auto;
@@ -1346,6 +1388,71 @@ button.primary {
     padding: 0.5rem;
     border-radius: 6px;
     margin-bottom: 0.5rem;
+  }
+
+  /* Enhanced mobile form styles for small screens */
+  .grid-form {
+    gap: 0.5rem;
+  }
+
+  .grid-form label {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .grid-form select,
+  .grid-form input,
+  .grid-form textarea {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+
+  .grid-form select[multiple] {
+    min-height: 100px;
+  }
+
+  /* Enhanced checkbox styles for small screens */
+  .checkbox {
+    padding: 0.625rem;
+    margin: 0.2rem 0;
+    border-radius: 8px;
+  }
+
+  .checkbox input[type="checkbox"] {
+    min-width: 18px;
+    min-height: 18px;
+    transform: scale(1.1);
+  }
+
+  .checkbox span {
+    font-size: 0.85rem;
+    line-height: 1.3;
+  }
+
+  /* Form button improvements */
+  .grid-form button[type="submit"] {
+    padding: 0.875rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    min-height: 48px;
+    margin-top: 0.5rem;
+  }
+
+  /* Participant controls mobile optimization */
+  .participant-controls {
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .participant-controls .checkbox {
+    padding: 0.5rem;
+    margin: 0;
+    background: transparent;
+    border: none;
   }
 
   .panel h2 {
