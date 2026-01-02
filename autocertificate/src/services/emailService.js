@@ -46,7 +46,7 @@ async function sendCertificateEmail(participant, certificate, options = {}) {
     global.gc(); // Force garbage collection if available
   }
 
-  const pdfBuffer = await readFromStorage(certificate.pdf_path);
+  let pdfBuffer = await readFromStorage(certificate.pdf_path);
   let filename = `certificate-${participant.id}.pdf`;
   try {
     if (certificate.pdf_path) {
