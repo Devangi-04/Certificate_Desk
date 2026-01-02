@@ -149,7 +149,16 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
     failures: [],
   };
 
-  for (const participant of participants) {
+  console.log(`🚀 Starting certificate generation for ${participants.length} participants...`);
+  console.log(`📊 Progress: 0/${participants.length} (0%) - Generated: 0, Emailed: 0, Failed: 0`);
+
+  for (let i = 0; i < participants.length; i++) {
+    const participant = participants[i];
+    const progress = Math.round(((i + 1) / participants.length) * 100);
+    
+    console.log(`📧 Processing participant ${i + 1}/${participants.length} (${progress}%) - ${participant.full_name || participant.extra_data?.name || 'Unknown'}`);
+    console.log(`📊 Current Status: Generated: ${summary.generated}, Emailed: ${summary.emailed}, Failed: ${summary.failures.length}`);
+    
     try {
       const certificateRecord = await ensureCertificateRecord(participant.id, templateId);
       const pdfDoc = await PDFDocument.load(basePdfBuffer);
@@ -255,8 +264,11 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
       };
 
       summary.generated += 1;
+      console.log(`✅ Certificate generated successfully for ${participant.full_name || participant.extra_data?.name || 'Unknown'} (${summary.generated}/${participants.length})`);
+      console.log(`📁 Saved to: ${storedPath}`);
 
       if (sendEmail) {
+        console.log(`📧 Sending email to: ${participant.email}...`);
         await sendCertificateEmail(
           participant,
           record,
@@ -269,12 +281,38 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
           [certificateRecord.id]
         );
         summary.emailed += 1;
+        console.log(`✅ Email sent successfully to ${participant.email} (${summary.emailed}/${participants.length})`);
       }
     } catch (err) {
-      console.error('Certificate generation failed', err);
+      console.error(`❌ Error processing ${participant.full_name || participant.extra_data?.name || 'Unknown'}: ${err.message}`);
+      console.error(`🔍 Participant ID: ${participant.id}, Email: ${participant.email}`);
       summary.failures.push({ participantId: participant.id, message: err.message });
+      console.log(`📊 Updated Status: Generated: ${summary.generated}, Emailed: ${summary.emailed}, Failed: ${summary.failures.length}`);
+    }
+    
+    // Show progress after each participant
+    if ((i + 1) % 10 === 0 || i === participants.length - 1) {
+      const progress = Math.round(((i + 1) / participants.length) * 100);
+      console.log(`📈 Progress Update: ${i + 1}/${participants.length} (${progress}%) complete`);
+      console.log(`📊 Summary: Generated: ${summary.generated}, Emailed: ${summary.emailed}, Failed: ${summary.failures.length}`);
     }
   }
+
+  console.log(`🎉 Certificate generation completed!`);
+  console.log(`📊 Final Summary:`);
+  console.log(`   📧 Total Participants: ${summary.total}`);
+  console.log(`   ✅ Certificates Generated: ${summary.generated}`);
+  console.log(`   📧 Emails Sent: ${summary.emailed}`);
+  console.log(`   ❌ Failed: ${summary.failures.length}`);
+  
+  if (summary.failures.length > 0) {
+    console.log(`❌ Failed Participants:`);
+    summary.failures.forEach((failure, index) => {
+      console.log(`   ${index + 1}. Participant ID: ${failure.participantId} - Error: ${failure.message}`);
+    });
+  }
+  
+  console.log(`🚀 Success Rate: ${Math.round(((summary.generated - summary.failures.length) / summary.total) * 100)}%`);
 
   return summary;
 }
