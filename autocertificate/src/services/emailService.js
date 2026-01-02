@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Rate limiting for Gmail SMTP (100 emails/day)
-const EMAIL_DELAY_MS = 6000; // 6 seconds between emails (10 emails/minute, safe for Gmail)
+const EMAIL_DELAY_MS = 8000; // 8 seconds between emails (7.5 emails/minute, extra safe for Gmail)
 let lastEmailSent = 0;
 
 async function delayEmailSending() {
@@ -41,10 +41,13 @@ async function sendCertificateEmail(participant, certificate, options = {}) {
   // Rate limiting: Wait before sending email
   await delayEmailSending();
 
-  // Add memory management
+  // Add memory management and safety
   if (global.gc) {
     global.gc(); // Force garbage collection if available
   }
+  
+  // Add additional safety delay for Vercel
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Extra 1 second safety
 
   let pdfBuffer = await readFromStorage(certificate.pdf_path);
   let filename = `certificate-${participant.id}.pdf`;
