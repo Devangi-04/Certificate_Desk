@@ -14,7 +14,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Rate limiting for Brevo SMTP (300 emails/day)
-const EMAIL_DELAY_MS = 1000; // 1 second between emails (60 emails/minute, safe for Brevo)
+const EMAIL_DELAY_MS = 2000; // 2 seconds between emails (30 emails/minute, extra safe for Brevo)
 let lastEmailSent = 0;
 
 async function delayEmailSending() {
@@ -40,6 +40,11 @@ async function sendCertificateEmail(participant, certificate, options = {}) {
 
   // Rate limiting: Wait before sending email
   await delayEmailSending();
+
+  // Add memory management
+  if (global.gc) {
+    global.gc(); // Force garbage collection if available
+  }
 
   const pdfBuffer = await readFromStorage(certificate.pdf_path);
   let filename = `certificate-${participant.id}.pdf`;
@@ -74,10 +79,30 @@ async function sendCertificateEmail(participant, certificate, options = {}) {
   };
 
   console.log(`Sending email to: ${participant.email} (${participant.full_name})`);
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`Email sent successfully to: ${participant.email} - Message ID: ${info.messageId}`);
   
-  return info;
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Email sent successfully to: ${participant.email} - Message ID: ${info.messageId}`);
+    
+    // Clear memory after successful send
+    pdfBuffer = null;
+    
+    return info;
+  } catch (error) {
+    console.error(`Failed to send email to ${participant.email}:`, error.message);
+    
+    // Clear memory on error
+    pdfBuffer = null;
+    
+    // Add retry logic for transient errors
+    if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+      console.log(`Retrying email to ${participant.email} after 5 seconds...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return sendCertificateEmail(participant, certificate, options);
+    }
+    
+    throw error;
+  }
 }
 
 module.exports = {
