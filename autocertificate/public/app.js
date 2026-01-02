@@ -132,6 +132,12 @@ function renderParticipants(participants = []) {
     .map((p) => `<option value="${p.id}">${p.full_name} — ${p.email}</option>`)
     .join('');
   
+  // Reset "Select All" checkbox when participants are re-rendered
+  if (selectAllParticipantsCheckbox) {
+    selectAllParticipantsCheckbox.checked = false;
+    selectAllParticipantsCheckbox.indeterminate = false;
+  }
+  
   updateDeleteSelectedButton();
 }
 
@@ -238,8 +244,16 @@ async function deleteSelectedParticipants() {
 
 function toggleSelectAllParticipants() {
   const isChecked = selectAllParticipantsCheckbox.checked;
+  console.log('Select All checkbox changed:', isChecked); // Debug log
+  
   const checkboxes = document.querySelectorAll('.participant-checkbox');
-  checkboxes.forEach(cb => cb.checked = isChecked);
+  console.log('Found checkboxes:', checkboxes.length); // Debug log
+  
+  checkboxes.forEach(cb => {
+    cb.checked = isChecked;
+    console.log('Set checkbox:', cb.dataset.id, 'to:', isChecked); // Debug log
+  });
+  
   updateDeleteSelectedButton();
 }
 
@@ -401,7 +415,33 @@ if (generateForm) {
 if (participantListEl) {
   participantListEl.addEventListener('click', (event) => {
     if (event.target.classList.contains('participant-checkbox')) {
+      console.log('Individual checkbox clicked:', event.target.dataset.id); // Debug log
       updateDeleteSelectedButton();
+    }
+  });
+  
+  // Also handle change events for better checkbox detection
+  participantListEl.addEventListener('change', (event) => {
+    if (event.target.classList.contains('participant-checkbox')) {
+      console.log('Individual checkbox changed:', event.target.dataset.id, event.target.checked); // Debug log
+      updateDeleteSelectedButton();
+      
+      // Update "Select All" checkbox state based on individual selections
+      const allCheckboxes = document.querySelectorAll('.participant-checkbox');
+      const checkedCheckboxes = document.querySelectorAll('.participant-checkbox:checked');
+      
+      if (selectAllParticipantsCheckbox) {
+        if (checkedCheckboxes.length === 0) {
+          selectAllParticipantsCheckbox.checked = false;
+          selectAllParticipantsCheckbox.indeterminate = false;
+        } else if (checkedCheckboxes.length === allCheckboxes.length) {
+          selectAllParticipantsCheckbox.checked = true;
+          selectAllParticipantsCheckbox.indeterminate = false;
+        } else {
+          selectAllParticipantsCheckbox.checked = false;
+          selectAllParticipantsCheckbox.indeterminate = true;
+        }
+      }
     }
   });
 }
