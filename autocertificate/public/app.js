@@ -215,18 +215,31 @@ function updateDeleteSelectedButton() {
 
 function getSelectedParticipantIds() {
   const checkboxes = document.querySelectorAll('.participant-checkbox:checked');
-  return Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+  console.log('getSelectedParticipantIds - Found checked checkboxes:', checkboxes.length); // Debug log
+  console.log('getSelectedParticipantIds - All checkboxes:', document.querySelectorAll('.participant-checkbox').length); // Debug log
+  
+  const ids = Array.from(checkboxes).map(cb => parseInt(cb.dataset.id));
+  console.log('getSelectedParticipantIds - Mapped IDs:', ids); // Debug log
+  
+  return ids;
 }
 
 async function deleteSelectedParticipants() {
   const selectedIds = getSelectedParticipantIds();
+  console.log('Delete Selected - Selected IDs:', selectedIds); // Debug log
+  console.log('Delete Selected - Selected count:', selectedIds.length); // Debug log
+  
   if (selectedIds.length === 0) {
     showToast('No participants selected', 'info');
     return;
   }
   
   // More specific confirmation for selected participants
-  if (!confirm(`Delete only the ${selectedIds.length} selected participants?\n\nThis will remove:\n• ${selectedIds.length} selected participant(s)\n• 0 unselected participant(s)\n\nThis action cannot be undone.`)) {
+  const confirmMessage = `Delete only the ${selectedIds.length} selected participants?\n\nThis will remove:\n• ${selectedIds.length} selected participant(s)\n• 0 unselected participant(s)\n\nThis action cannot be undone.`;
+  
+  console.log('Delete Selected - Confirm message:', confirmMessage); // Debug log
+  
+  if (!confirm(confirmMessage)) {
     return;
   }
   
