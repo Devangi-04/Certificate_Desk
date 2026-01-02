@@ -13,6 +13,23 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Rate limiting for Gmail SMTP
+const EMAIL_DELAY_MS = 6000; // 6 seconds between emails (10 emails/minute)
+let lastEmailSent = 0;
+
+async function delayEmailSending() {
+  const now = Date.now();
+  const timeSinceLastEmail = now - lastEmailSent;
+  
+  if (timeSinceLastEmail < EMAIL_DELAY_MS) {
+    const delayTime = EMAIL_DELAY_MS - timeSinceLastEmail;
+    console.log(`Rate limiting: Waiting ${delayTime}ms before sending next email...`);
+    await new Promise(resolve => setTimeout(resolve, delayTime));
+  }
+  
+  lastEmailSent = Date.now();
+}
+
 async function sendCertificateEmail(participant, certificate, options = {}) {
   if (!participant.email) {
     throw new Error('Participant email is missing');
@@ -20,6 +37,9 @@ async function sendCertificateEmail(participant, certificate, options = {}) {
   if (!certificate.pdf_path) {
     throw new Error('Certificate PDF not generated yet');
   }
+
+  // Rate limiting: Wait before sending email
+  await delayEmailSending();
 
   const pdfBuffer = await readFromStorage(certificate.pdf_path);
   let filename = `certificate-${participant.id}.pdf`;
@@ -53,7 +73,10 @@ async function sendCertificateEmail(participant, certificate, options = {}) {
     ],
   };
 
+  console.log(`Sending email to: ${participant.email} (${participant.full_name})`);
   const info = await transporter.sendMail(mailOptions);
+  console.log(`Email sent successfully to: ${participant.email} - Message ID: ${info.messageId}`);
+  
   return info;
 }
 
