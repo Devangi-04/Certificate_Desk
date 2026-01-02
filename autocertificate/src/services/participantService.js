@@ -251,14 +251,27 @@ async function deleteParticipant(participantId) {
 }
 
 async function deleteAllParticipants() {
-  const result = await query('DELETE FROM participants');
-  return { deletedCount: result.rowCount || 0 };
+  // Get count before deletion
+  const countResult = await query('SELECT COUNT(*) as count FROM participants');
+  const deletedCount = countResult[0]?.count || 0;
+  
+  // Delete all participants
+  await query('DELETE FROM participants');
+  
+  return { deletedCount };
 }
 
 async function deleteParticipantsByIds(participantIds = []) {
   if (!participantIds.length) return { deletedCount: 0 };
-  const result = await query('DELETE FROM participants WHERE id = ANY($1::bigint[])', [participantIds]);
-  return { deletedCount: result.rowCount || 0 };
+  
+  // Get count of participants that will be deleted
+  const countResult = await query('SELECT COUNT(*) as count FROM participants WHERE id = ANY($1::bigint[])', [participantIds]);
+  const deletedCount = countResult[0]?.count || 0;
+  
+  // Delete the participants
+  await query('DELETE FROM participants WHERE id = ANY($1::bigint[])', [participantIds]);
+  
+  return { deletedCount };
 }
 
 module.exports = {
