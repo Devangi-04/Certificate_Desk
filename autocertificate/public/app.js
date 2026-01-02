@@ -254,7 +254,7 @@ async function clearAllParticipants() {
   }
   
   // First confirmation - very clear this is ALL participants
-  const confirmMessage = `🚨 DELETE ALL PARTICIPANTS 🚨\n\nYou are about to delete ALL ${domParticipantCount} participants in the system!\n\nThis includes:\n• ${domParticipantCount} total participant(s)\n• Both selected AND unselected\n\n⚠️ This action CANNOT be undone!\n\nClick "OK" to DELETE ALL PARTICIPANTS\nClick "Cancel" to keep them`;
+  const confirmMessage = `DELETE ALL PARTICIPANTS\n\nYou are about to delete ALL ${domParticipantCount} participants in the system!\n\nThis includes:\n• ${domParticipantCount} total participant(s)\n• Both selected AND unselected\n\nWARNING: This action CANNOT be undone!\n\nClick "OK" to DELETE ALL PARTICIPANTS\nClick "Cancel" to keep them`;
   
   if (!confirm(confirmMessage)) {
     showToast('Participant deletion cancelled - no participants were removed', 'info');
@@ -262,7 +262,7 @@ async function clearAllParticipants() {
   }
   
   // Second confirmation for extra safety
-  const secondConfirm = `🚨 FINAL CONFIRMATION 🚨\n\nAre you ABSOLUTELY SURE you want to delete all ${domParticipantCount} participants?\n\nClick "OK" to proceed, "Cancel" to abort)`;
+  const secondConfirm = `FINAL CONFIRMATION\n\nAre you ABSOLUTELY SURE you want to delete all ${domParticipantCount} participants?\n\nClick "OK" to proceed, "Cancel" to abort`;
   
   if (!confirm(secondConfirm)) {
     showToast('Participant deletion cancelled - no participants were removed', 'info');
