@@ -100,8 +100,10 @@ async function importParticipantsFromWorkbook(buffer, originalName) {
     rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
   }
 
-  const created = [];
+  // Process and validate all rows first
+  const processedParticipants = [];
   let skipped = 0;
+  
   for (const row of rows) {
     const normalizedRow = buildNormalizedRow(row);
 
@@ -149,31 +151,73 @@ async function importParticipantsFromWorkbook(buffer, originalName) {
 
     const extraData = row && Object.keys(row).length ? row : null;
 
-    const existing = await query('SELECT id FROM participants WHERE email = $1', [email]);
-    let participantId;
-    if (existing.length) {
-      participantId = existing[0].id;
+    processedParticipants.push({
+      name,
+      email,
+      mesId,
+      extraData,
+      source: fileExtension
+    });
+  }
+
+  // Bulk operations - get all existing emails at once
+  const emails = processedParticipants.map(p => p.email);
+  const existingParticipants = emails.length > 0 
+    ? await query('SELECT id, email FROM participants WHERE email = ANY($1::text[])', [emails])
+    : [];
+  
+  const existingEmailMap = new Map(existingParticipants.map(p => [p.email, p.id]));
+
+  // Separate into updates and inserts
+  const toUpdate = [];
+  const toInsert = [];
+  
+  for (const participant of processedParticipants) {
+    if (existingEmailMap.has(participant.email)) {
+      toUpdate.push({
+        ...participant,
+        id: existingEmailMap.get(participant.email)
+      });
+    } else {
+      toInsert.push(participant);
+    }
+  }
+
+  // Bulk update existing participants
+  let updatedCount = 0;
+  if (toUpdate.length > 0) {
+    for (const participant of toUpdate) {
       await query(
         `UPDATE participants
-         SET full_name = $1, mes_id = $2, extra_data = $3, source = $4
+         SET full_name = $1, mes_id = $2, extra_data = $3, source = $4, updated_at = NOW()
          WHERE id = $5`,
-        [name, mesId, extraData, fileExtension, participantId]
+        [participant.name, participant.mesId, participant.extraData, participant.source, participant.id]
       );
-    } else {
-      const [inserted] = await query(
-        `INSERT INTO participants (full_name, email, mes_id, extra_data, source)
-         VALUES ($1,$2,$3,$4,$5)
-         RETURNING id`,
-        [name, email, mesId, extraData, fileExtension]
-      );
-      participantId = inserted.id;
+      updatedCount++;
     }
-    created.push(participantId);
+  }
+
+  // Bulk insert new participants
+  let insertedCount = 0;
+  if (toInsert.length > 0) {
+    const values = toInsert.map(p => 
+      `('${p.name.replace(/'/g, "''")}', '${p.email}', ${p.mesId ? `'${p.mesId.replace(/'/g, "''")}'` : null}, ${p.extraData ? `'${JSON.stringify(p.extraData).replace(/'/g, "''")}'` : null}, '${p.source}')`
+    ).join(',');
+    
+    const result = await query(
+      `INSERT INTO participants (full_name, email, mes_id, extra_data, source)
+       VALUES ${values}
+       RETURNING id`,
+      []
+    );
+    insertedCount = result.length;
   }
 
   return {
     storedFile: saved,
-    participantsProcessed: created.length,
+    participantsProcessed: processedParticipants.length,
+    participantsInserted: insertedCount,
+    participantsUpdated: updatedCount,
     participantsSkipped: skipped,
   };
 }

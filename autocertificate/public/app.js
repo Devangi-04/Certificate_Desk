@@ -50,7 +50,7 @@ let shouldAutoSetColor = false;
 
 function showToast(message, type = 'info') {
   if (!toastEl) return;
-  toastEl.textContent = message;
+  toastEl.innerHTML = message.replace(/\n/g, '<br>'); // Support line breaks
   toastEl.dataset.type = type;
   toastEl.hidden = false;
   toastEl.classList.add('show');
@@ -58,7 +58,7 @@ function showToast(message, type = 'info') {
   showToast.timeoutId = setTimeout(() => {
     toastEl.classList.remove('show');
     toastEl.hidden = true;
-  }, 3500);
+  }, 5000); // Longer timeout for detailed messages
 }
 
 async function fetchJSON(path, options = {}) {
@@ -301,13 +301,31 @@ if (participantForm) {
       return;
     }
 
+    // Show loading state
+    const submitButton = participantForm.querySelector('button[type="submit"]');
+    const originalText = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Importing...';
+
     try {
       const result = await uploadMultipart('/participants/import', formData);
-      showToast(`Imported ${result.participantsProcessed} participants`);
+      
+      // Show detailed import results
+      let message = `Import completed!\n`;
+      message += `• ${result.participantsProcessed} participants processed\n`;
+      message += `• ${result.participantsInserted || 0} new participants added\n`;
+      message += `• ${result.participantsUpdated || 0} existing participants updated\n`;
+      message += `• ${result.participantsSkipped} participants skipped`;
+      
+      showToast(message);
       participantForm.reset();
       await loadParticipants();
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      // Reset button state
+      submitButton.disabled = false;
+      submitButton.textContent = originalText;
     }
   });
 }

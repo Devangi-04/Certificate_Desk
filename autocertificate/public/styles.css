@@ -1430,6 +1430,14 @@ button.primary {
     line-height: 1.3;
   }
 
+  /* Toast improvements for detailed messages */
+  .toast {
+    white-space: pre-line;
+    line-height: 1.4;
+    max-width: 90vw;
+    word-wrap: break-word;
+  }
+
   /* Form button improvements */
   .grid-form button[type="submit"] {
     padding: 0.875rem 1rem;
