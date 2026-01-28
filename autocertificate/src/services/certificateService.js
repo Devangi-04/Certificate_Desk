@@ -78,6 +78,18 @@ function slugify(value = '') {
     .slice(0, 80);
 }
 
+async function logCertificateDelivery(certificateId, status, message = null) {
+  try {
+    await query(
+      `INSERT INTO certificate_delivery_logs (certificate_id, status, message)
+       VALUES ($1, $2, $3)`,
+      [certificateId, status, message]
+    );
+  } catch (err) {
+    console.error('Failed to log certificate delivery', { certificateId, status, message, err });
+  }
+}
+
 async function ensureCertificateRecord(participantId, templateId) {
   const rows = await query(
     'SELECT * FROM certificates WHERE participant_id = $1 AND template_id = $2',
@@ -95,13 +107,36 @@ async function ensureCertificateRecord(participantId, templateId) {
   return inserted;
 }
 
-async function listCertificates() {
+async function listCertificates(filters = {}) {
+  const { templateId = null, participantIds = null, deliveryStatus = null } = filters;
+  const conditions = ['c.deleted_at IS NULL'];
+  const params = [];
+
+  if (templateId) {
+    params.push(Number(templateId));
+    conditions.push(`c.template_id = $${params.length}`);
+  }
+
+  if (Array.isArray(participantIds) && participantIds.length) {
+    params.push(participantIds.map(Number));
+    conditions.push(`c.participant_id = ANY($${params.length}::bigint[])`);
+  }
+
+  if (deliveryStatus) {
+    params.push(deliveryStatus);
+    conditions.push(`c.delivery_status = $${params.length}`);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
   return query(
     `SELECT c.*, p.full_name, p.email, t.original_name AS template_name
      FROM certificates c
      JOIN participants p ON p.id = c.participant_id
      JOIN templates t ON t.id = c.template_id
-     ORDER BY c.updated_at DESC`
+     ${whereClause}
+     ORDER BY c.updated_at DESC`,
+    params
   );
 }
 
@@ -149,16 +184,7 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
     failures: [],
   };
 
-  console.log(`🚀 Starting certificate generation for ${participants.length} participants...`);
-  console.log(`📊 Progress: 0/${participants.length} (0%) - Generated: 0, Emailed: 0, Failed: 0`);
-
-  for (let i = 0; i < participants.length; i++) {
-    const participant = participants[i];
-    const progress = Math.round(((i + 1) / participants.length) * 100);
-    
-    console.log(`📧 Processing participant ${i + 1}/${participants.length} (${progress}%) - ${participant.full_name || participant.extra_data?.name || 'Unknown'}`);
-    console.log(`📊 Current Status: Generated: ${summary.generated}, Emailed: ${summary.emailed}, Failed: ${summary.failures.length}`);
-    
+  for (const participant of participants) {
     try {
       const certificateRecord = await ensureCertificateRecord(participant.id, templateId);
       const pdfDoc = await PDFDocument.load(basePdfBuffer);
@@ -264,55 +290,38 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
       };
 
       summary.generated += 1;
-      console.log(`✅ Certificate generated successfully for ${participant.full_name || participant.extra_data?.name || 'Unknown'} (${summary.generated}/${participants.length})`);
-      console.log(`📁 Saved to: ${storedPath}`);
 
       if (sendEmail) {
-        console.log(`📧 Sending email to: ${participant.email}...`);
-        await sendCertificateEmail(
-          participant,
-          record,
-          { eventName }
-        );
-        await query(
-          `UPDATE certificates
-           SET delivery_status = 'sent', delivery_message = NULL, sent_at = NOW()
-           WHERE id = $1`,
-          [certificateRecord.id]
-        );
-        summary.emailed += 1;
-        console.log(`✅ Email sent successfully to ${participant.email} (${summary.emailed}/${participants.length})`);
+        try {
+          await sendCertificateEmail(
+            participant,
+            record,
+            { eventName }
+          );
+          await query(
+            `UPDATE certificates
+             SET delivery_status = 'sent', delivery_message = NULL, sent_at = NOW()
+             WHERE id = $1`,
+            [certificateRecord.id]
+          );
+          await logCertificateDelivery(certificateRecord.id, 'sent');
+          summary.emailed += 1;
+        } catch (emailErr) {
+          await query(
+            `UPDATE certificates
+             SET delivery_status = 'failed', delivery_message = $2
+             WHERE id = $1`,
+            [certificateRecord.id, emailErr.message || 'Email send failed']
+          );
+          await logCertificateDelivery(certificateRecord.id, 'failed', emailErr.message || null);
+          throw emailErr;
+        }
       }
     } catch (err) {
-      console.error(`❌ Error processing ${participant.full_name || participant.extra_data?.name || 'Unknown'}: ${err.message}`);
-      console.error(`🔍 Participant ID: ${participant.id}, Email: ${participant.email}`);
+      console.error('Certificate generation failed', err);
       summary.failures.push({ participantId: participant.id, message: err.message });
-      console.log(`📊 Updated Status: Generated: ${summary.generated}, Emailed: ${summary.emailed}, Failed: ${summary.failures.length}`);
-    }
-    
-    // Show progress after each participant
-    if ((i + 1) % 10 === 0 || i === participants.length - 1) {
-      const progress = Math.round(((i + 1) / participants.length) * 100);
-      console.log(`📈 Progress Update: ${i + 1}/${participants.length} (${progress}%) complete`);
-      console.log(`📊 Summary: Generated: ${summary.generated}, Emailed: ${summary.emailed}, Failed: ${summary.failures.length}`);
     }
   }
-
-  console.log(`🎉 Certificate generation completed!`);
-  console.log(`📊 Final Summary:`);
-  console.log(`   📧 Total Participants: ${summary.total}`);
-  console.log(`   ✅ Certificates Generated: ${summary.generated}`);
-  console.log(`   📧 Emails Sent: ${summary.emailed}`);
-  console.log(`   ❌ Failed: ${summary.failures.length}`);
-  
-  if (summary.failures.length > 0) {
-    console.log(`❌ Failed Participants:`);
-    summary.failures.forEach((failure, index) => {
-      console.log(`   ${index + 1}. Participant ID: ${failure.participantId} - Error: ${failure.message}`);
-    });
-  }
-  
-  console.log(`🚀 Success Rate: ${Math.round(((summary.generated - summary.failures.length) / summary.total) * 100)}%`);
 
   return summary;
 }
@@ -337,15 +346,26 @@ async function sendCertificateById(certificateId, options = {}) {
     full_name: certificate.full_name,
     email: certificate.email,
   };
-  await sendCertificateEmail(participant, certificate, options);
-  await query(
-    `UPDATE certificates
-     SET delivery_status = 'sent', delivery_message = NULL, sent_at = NOW()
-     WHERE id = $1`,
-    [certificateId]
-  );
-  
-  return { certificateId, status: 'sent' };
+  try {
+    await sendCertificateEmail(participant, certificate, options);
+    await query(
+      `UPDATE certificates
+       SET delivery_status = 'sent', delivery_message = NULL, sent_at = NOW()
+       WHERE id = $1`,
+      [certificateId]
+    );
+    await logCertificateDelivery(certificateId, 'sent');
+    return { certificateId, status: 'sent' };
+  } catch (err) {
+    await query(
+      `UPDATE certificates
+       SET delivery_status = 'failed', delivery_message = $2
+       WHERE id = $1`,
+      [certificateId, err.message || 'Email send failed']
+    );
+    await logCertificateDelivery(certificateId, 'failed', err.message || null);
+    throw err;
+  }
 }
 
 async function getCertificateById(certificateId) {

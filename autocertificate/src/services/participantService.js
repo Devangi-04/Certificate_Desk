@@ -163,7 +163,10 @@ async function importParticipantsFromWorkbook(buffer, originalName) {
   // Bulk operations - get all existing emails at once
   const emails = processedParticipants.map(p => p.email);
   const existingParticipants = emails.length > 0 
-    ? await query('SELECT id, email FROM participants WHERE email = ANY($1::text[])', [emails])
+    ? await query(
+        'SELECT id, email FROM participants WHERE email = ANY($1::text[]) AND deleted_at IS NULL',
+        [emails]
+      )
     : [];
   
   const existingEmailMap = new Map(existingParticipants.map(p => [p.email, p.id]));
@@ -223,12 +226,12 @@ async function importParticipantsFromWorkbook(buffer, originalName) {
 }
 
 async function listParticipants() {
-  return query('SELECT * FROM participants ORDER BY created_at DESC');
+  return query('SELECT * FROM participants WHERE deleted_at IS NULL ORDER BY created_at DESC');
 }
 
 async function getParticipantsByIds(ids = []) {
   if (!ids.length) return [];
-  return query('SELECT * FROM participants WHERE id = ANY($1::bigint[])', [ids]);
+  return query('SELECT * FROM participants WHERE id = ANY($1::bigint[]) AND deleted_at IS NULL', [ids]);
 }
 
 async function createParticipant({ full_name, email, mes_id = null, extra_data = null, source = 'manual' }) {
@@ -236,7 +239,10 @@ async function createParticipant({ full_name, email, mes_id = null, extra_data =
     throw new Error('Full name and email are required');
   }
   const normalizedEmail = email.trim().toLowerCase();
-  const existing = await query('SELECT id FROM participants WHERE email = $1', [normalizedEmail]);
+  const existing = await query(
+    'SELECT id FROM participants WHERE email = $1 AND deleted_at IS NULL',
+    [normalizedEmail]
+  );
   if (existing.length) {
     const error = new Error('Participant with this email already exists');
     error.status = 409;
@@ -252,7 +258,10 @@ async function createParticipant({ full_name, email, mes_id = null, extra_data =
 }
 
 async function updateParticipant(participantId, { full_name, email, mes_id = null, extra_data = null }) {
-  const participant = await query('SELECT * FROM participants WHERE id = $1', [participantId]);
+  const participant = await query(
+    'SELECT * FROM participants WHERE id = $1 AND deleted_at IS NULL',
+    [participantId]
+  );
   if (!participant.length) {
     const error = new Error('Participant not found');
     error.status = 404;
@@ -261,10 +270,10 @@ async function updateParticipant(participantId, { full_name, email, mes_id = nul
 
   const normalizedEmail = email ? email.trim().toLowerCase() : participant[0].email;
   if (normalizedEmail !== participant[0].email) {
-    const existing = await query('SELECT id FROM participants WHERE email = $1 AND id <> $2', [
-      normalizedEmail,
-      participantId,
-    ]);
+    const existing = await query(
+      'SELECT id FROM participants WHERE email = $1 AND id <> $2 AND deleted_at IS NULL',
+      [normalizedEmail, participantId]
+    );
     if (existing.length) {
       const error = new Error('Another participant already uses this email');
       error.status = 409;
@@ -290,15 +299,24 @@ async function updateParticipant(participantId, { full_name, email, mes_id = nul
 }
 
 async function deleteParticipant(participantId) {
-  await query('DELETE FROM participants WHERE id = $1', [participantId]);
-  return { id: participantId };
+  const result = await query(
+    `UPDATE participants
+     SET deleted_at = NOW(), updated_at = NOW()
+     WHERE id = $1 AND deleted_at IS NULL
+     RETURNING id`,
+    [participantId]
+  );
+  if (!result.length) {
+    return { id: participantId, deleted: false };
+  }
+  return { id: participantId, deleted: true };
 }
 
 async function deleteAllParticipants() {
   console.log('deleteAllParticipants called');
   
   // Get count before deletion
-  const countResult = await query('SELECT COUNT(*) as count FROM participants');
+  const countResult = await query('SELECT COUNT(*) as count FROM participants WHERE deleted_at IS NULL');
   const deletedCount = countResult[0]?.count || 0;
   
   console.log('Participants to delete:', deletedCount);
@@ -308,11 +326,13 @@ async function deleteAllParticipants() {
     return { deletedCount: 0 };
   }
   
-  // Delete all participants
-  const deleteResult = await query('DELETE FROM participants');
-  console.log('Delete query result:', deleteResult);
+  await query(
+    `UPDATE participants
+     SET deleted_at = NOW(), updated_at = NOW()
+     WHERE deleted_at IS NULL`
+  );
   
-  console.log('Deleted', deletedCount, 'participants');
+  console.log('Deleted', deletedCount, 'participants (soft delete)');
   return { deletedCount };
 }
 
@@ -320,11 +340,22 @@ async function deleteParticipantsByIds(participantIds = []) {
   if (!participantIds.length) return { deletedCount: 0 };
   
   // Get count of participants that will be deleted
-  const countResult = await query('SELECT COUNT(*) as count FROM participants WHERE id = ANY($1::bigint[])', [participantIds]);
+  const countResult = await query(
+    'SELECT COUNT(*) as count FROM participants WHERE id = ANY($1::bigint[]) AND deleted_at IS NULL',
+    [participantIds]
+  );
   const deletedCount = countResult[0]?.count || 0;
   
-  // Delete the participants
-  await query('DELETE FROM participants WHERE id = ANY($1::bigint[])', [participantIds]);
+  if (deletedCount === 0) {
+    return { deletedCount: 0 };
+  }
+
+  await query(
+    `UPDATE participants
+     SET deleted_at = NOW(), updated_at = NOW()
+     WHERE id = ANY($1::bigint[]) AND deleted_at IS NULL`,
+    [participantIds]
+  );
   
   return { deletedCount };
 }
