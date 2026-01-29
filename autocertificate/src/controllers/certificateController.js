@@ -3,6 +3,11 @@ const {
   generateCertificates,
   sendCertificateById,
   getCertificateById,
+  hideCertificate,
+  unhideCertificate,
+  softDeleteCertificate,
+  getCertificateByIdForVerification,
+  getCertificateQRCode,
 } = require('../services/certificateService');
 const XLSX = require('xlsx');
 const { success } = require('../utils/response');
@@ -44,6 +49,7 @@ async function postGenerateCertificates(req, res) {
     participantIds,
     sendEmail,
     eventName,
+    req, // Pass req object for QR code URL generation
   });
   return success(res, summary, 201);
 }
@@ -148,7 +154,8 @@ async function getCertificatesCsv(req, res) {
 
 async function downloadCertificate(req, res) {
   const { certificateId } = req.params;
-  const certificate = await getCertificateById(certificateId);
+  // Use verification function to allow download of hidden but valid certificates
+  const certificate = await getCertificateByIdForVerification(certificateId);
   
   if (!certificate || !certificate.pdf_path) {
     const error = new Error('Certificate PDF not found');
@@ -167,6 +174,92 @@ async function downloadCertificate(req, res) {
   return res.send(pdfBuffer);
 }
 
+async function hideCertificateById(req, res) {
+  const { certificateId } = req.params;
+  const certificate = await hideCertificate(certificateId);
+  
+  if (!certificate) {
+    const error = new Error('Certificate not found or already deleted');
+    error.status = 404;
+    throw error;
+  }
+  
+  return success(res, { certificate, message: 'Certificate hidden from dashboard' });
+}
+
+async function unhideCertificateById(req, res) {
+  const { certificateId } = req.params;
+  const certificate = await unhideCertificate(certificateId);
+  
+  if (!certificate) {
+    const error = new Error('Certificate not found or deleted');
+    error.status = 404;
+    throw error;
+  }
+  
+  return success(res, { certificate, message: 'Certificate restored to dashboard' });
+}
+
+async function revokeCertificate(req, res) {
+  const { certificateId } = req.params;
+  const certificate = await softDeleteCertificate(certificateId);
+  
+  if (!certificate) {
+    const error = new Error('Certificate not found');
+    error.status = 404;
+    throw error;
+  }
+  
+  return success(res, { certificate, message: 'Certificate revoked and marked as invalid' });
+}
+
+async function verifyCertificate(req, res) {
+  const { certificateId } = req.params;
+  // Use verification function that ignores visibility but respects soft delete
+  const certificate = await getCertificateByIdForVerification(certificateId);
+  
+  if (!certificate) {
+    return success(res, { valid: false, reason: 'Certificate not found or has been revoked' });
+  }
+  
+  if (certificate.status !== 'generated') {
+    return success(res, { valid: false, reason: 'Certificate generation incomplete' });
+  }
+  
+  return success(res, {
+    valid: true,
+    certificate: {
+      id: certificate.id,
+      certificate_full_id: certificate.certificate_full_id || `CD/${new Date().getFullYear()}/${String(certificate.id).padStart(6, '0')}`,
+      participant_name: certificate.full_name,
+      template_name: certificate.template_name,
+      created_at: certificate.created_at,
+      status: certificate.status,
+      delivery_status: certificate.delivery_status,
+      verification_url: certificate.verification_url,
+      qr_code_path: certificate.qr_code_path
+    }
+  });
+}
+
+async function getQRCode(req, res) {
+  const { certificateId } = req.params;
+  try {
+    const certificate = await getCertificateQRCode(certificateId);
+    
+    const { readFromStorage } = require('../utils/fileStorage');
+    const qrBuffer = await readFromStorage(certificate.qr_code_path);
+    
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    return res.send(qrBuffer);
+  } catch (error) {
+    const err = new Error('QR code not found');
+    err.status = 404;
+    throw err;
+  }
+}
+
 module.exports = {
   getCertificates,
   postGenerateCertificates,
@@ -174,4 +267,9 @@ module.exports = {
   getCertificatesCsv,
   getCertificatesExcel,
   downloadCertificate,
+  hideCertificateById,
+  unhideCertificateById,
+  revokeCertificate,
+  verifyCertificate,
+  getQRCode,
 };

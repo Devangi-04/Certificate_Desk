@@ -26,6 +26,13 @@ const nudgeControls = document.getElementById('nudge-controls');
 const positionBadge = document.getElementById('position-badge');
 const colorToggle = document.getElementById('color-toggle');
 
+// QR code positioning elements
+const enableQrCheckbox = document.getElementById('enable-qr');
+const qrPositionControls = document.getElementById('qr-position-controls');
+const qrSizeInput = document.getElementById('qr-size');
+const qrPositionBadge = document.getElementById('qr-position-badge');
+const qrPreview = document.getElementById('qr-preview');
+
 const templateForm = document.getElementById('template-form');
 const participantForm = document.getElementById('participant-form');
 const generateForm = document.getElementById('generate-form');
@@ -45,6 +52,7 @@ let isDragging = false;
 let dragOffset = { x: 0, y: 0 };
 let canvasImage = null;
 let placementData = { x: 0.5, y: 0.5, fontSize: 36, align: 'center', color: '#f5f7ff' };
+let qrData = { enabled: false, x: 0.85, y: 0.15, size: 80 }; // Default QR position
 let shouldAutoDetectPlacement = false;
 let shouldAutoSetColor = false;
 
@@ -148,16 +156,41 @@ function renderCertificates(certificates = []) {
       const pdfLink = c.pdf_path
         ? `<a href="/api/certificates/${c.id}/download" target="_blank">Download</a>`
         : '<span>—</span>';
+      
+      const qrLink = c.qr_code_path
+        ? `<a href="/api/certificates/${c.id}/qr" target="_blank" title="View QR Code">QR</a>`
+        : '<span>—</span>';
+      
+      const verificationLink = c.verification_url
+        ? `<a href="${c.verification_url}" target="_blank" title="Verify Certificate">Verify</a>`
+        : '<span>—</span>';
+      
+      const certificateId = c.certificate_full_id || `CD/${new Date().getFullYear()}/${String(c.id).padStart(6, '0')}`;
+      
+      const visibilityBadge = c.is_visible 
+        ? '<span class="status-pill success">Visible</span>'
+        : '<span class="status-pill warning">Hidden</span>';
+      
+      const visibilityAction = c.is_visible
+        ? `<button class="ghost warning" data-action="hide" data-id="${c.id}" title="Hide from dashboard">Hide</button>`
+        : `<button class="ghost" data-action="unhide" data-id="${c.id}" title="Show in dashboard">Unhide</button>`;
+      
       return `
         <tr>
           <td>${c.full_name}</td>
           <td>${c.email}</td>
           <td>${c.template_name || '—'}</td>
+          <td><strong>${certificateId}</strong></td>
           <td>${pdfLink}</td>
           <td><span class="status-pill ${c.status}">${c.status}</span></td>
           <td><span class="status-pill ${c.delivery_status}">${c.delivery_status}</span></td>
+          <td>${visibilityBadge}</td>
+          <td>${qrLink}</td>
+          <td>${verificationLink}</td>
           <td>
             <button class="ghost" data-action="resend" data-id="${c.id}">Resend</button>
+            ${visibilityAction}
+            <button class="ghost danger" data-action="revoke" data-id="${c.id}" title="Permanently revoke certificate">Revoke</button>
           </td>
         </tr>`;
     })
@@ -563,18 +596,60 @@ if (templateListEl) {
 
 if (certTableEl) {
   certTableEl.addEventListener('click', async (event) => {
-    const target = event.target.closest('button[data-action="resend"]');
+    const target = event.target.closest('button[data-action]');
     if (!target) return;
+    
     const certId = target.dataset.id;
+    const action = target.dataset.action;
+    
+    if (!certId || !action) return;
     
     target.disabled = true;
+    
     try {
-      const result = await fetchJSON(`/certificates/${certId}/send`, { 
-        method: 'POST', 
-        body: JSON.stringify({}) 
-      });
+      let result;
+      let successMessage;
       
-      showToast('Certificate resent successfully');
+      switch (action) {
+        case 'resend':
+          result = await fetchJSON(`/certificates/${certId}/send`, { 
+            method: 'POST', 
+            body: JSON.stringify({}) 
+          });
+          successMessage = 'Certificate resent successfully';
+          break;
+          
+        case 'hide':
+          result = await fetchJSON(`/certificates/${certId}/hide`, { 
+            method: 'POST' 
+          });
+          successMessage = 'Certificate hidden from dashboard';
+          break;
+          
+        case 'unhide':
+          result = await fetchJSON(`/certificates/${certId}/unhide`, { 
+            method: 'POST' 
+          });
+          successMessage = 'Certificate restored to dashboard';
+          break;
+          
+        case 'revoke':
+          if (!confirm('Are you sure you want to revoke this certificate? This will permanently invalidate it and it cannot be restored.')) {
+            target.disabled = false;
+            return;
+          }
+          result = await fetchJSON(`/certificates/${certId}/revoke`, { 
+            method: 'DELETE' 
+          });
+          successMessage = 'Certificate revoked successfully';
+          break;
+          
+        default:
+          target.disabled = false;
+          return;
+      }
+      
+      showToast(successMessage);
       await loadCertificates();
     } catch (err) {
       showToast(err.message, 'error');
@@ -644,6 +719,75 @@ function updateColorButtons() {
   });
 }
 
+function updateQrControls() {
+  if (!enableQrCheckbox) return;
+  
+  // Update checkbox state
+  enableQrCheckbox.checked = qrData.enabled;
+  
+  // Show/hide QR positioning controls
+  if (qrPositionControls) {
+    qrPositionControls.style.display = qrData.enabled ? 'block' : 'none';
+  }
+  
+  // Show/hide QR preview
+  if (qrPreview) {
+    qrPreview.style.display = qrData.enabled ? 'block' : 'none';
+  }
+  
+  // Update QR size input
+  if (qrSizeInput) {
+    qrSizeInput.value = qrData.size;
+  }
+  
+  // Update QR position badge
+  if (qrPositionBadge) {
+    if (qrData.enabled) {
+      qrPositionBadge.textContent = `X ${Math.round(qrData.x * 100)}% · Y ${Math.round(qrData.y * 100)}%`;
+    } else {
+      qrPositionBadge.textContent = 'Not positioned';
+    }
+  }
+}
+
+function updateQrPosition(x, y) {
+  qrData.x = x;
+  qrData.y = y;
+  updateQrControls();
+}
+
+function updateQrPreview() {
+  if (!qrPreview || !templateCanvas || !qrData.enabled) return;
+  
+  const canvasRect = templateCanvas.getBoundingClientRect();
+  const containerRect = templateCanvas.parentElement.getBoundingClientRect();
+  
+  // Calculate QR position in pixels
+  const qrX = canvasRect.width * qrData.x;
+  const qrY = canvasRect.height * qrData.y;
+  
+  // Position QR preview
+  const offsetX = canvasRect.left - containerRect.left;
+  const offsetY = canvasRect.top - containerRect.top;
+  
+  qrPreview.style.left = `${offsetX + qrX - qrData.size/2}px`;
+  qrPreview.style.top = `${offsetY + qrY - qrData.size/2}px`;
+  qrPreview.style.width = `${qrData.size}px`;
+  qrPreview.style.height = `${qrData.size}px`;
+  qrPreview.style.fontSize = `${Math.max(12, qrData.size/4)}px`;
+  qrPreview.style.display = 'flex';
+  qrPreview.style.alignItems = 'center';
+  qrPreview.style.justifyContent = 'center';
+  qrPreview.style.border = '2px dashed #007bff';
+  qrPreview.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
+  qrPreview.style.color = '#007bff';
+  qrPreview.style.fontWeight = 'bold';
+  qrPreview.style.borderRadius = '4px';
+  qrPreview.style.position = 'absolute';
+  qrPreview.style.pointerEvents = 'none';
+  qrPreview.style.zIndex = '10';
+}
+
 function openPlacementModal(template) {
   console.log('=== OPENING PLACEMENT MODAL ===');
   console.log('Template data from server:', template);
@@ -661,6 +805,22 @@ function openPlacementModal(template) {
     align: template.text_align || 'center',
     color: normalizeColor(template.text_color_hex, '#f5f7ff'),
   };
+
+  // Load QR code positioning data
+  qrData = {
+    enabled: template.qr_x_ratio !== null && template.qr_y_ratio !== null,
+    x: template.qr_x_ratio || 0.85,
+    y: template.qr_y_ratio || 0.15,
+    size: template.qr_size || 80,
+  };
+  
+  console.log('=== LOADING QR DATA ===');
+  console.log('Template QR data from server:', {
+    qr_x_ratio: template.qr_x_ratio,
+    qr_y_ratio: template.qr_y_ratio,
+    qr_size: template.qr_size
+  });
+  console.log('Initialized qrData:', qrData);
 
   // Derive ratios for preview, or default to center if no pixel data exists
   if (placementData.pixelX !== null && placementData.canvasWidth > 0) {
@@ -703,6 +863,7 @@ function openPlacementModal(template) {
   setFontSize(placementData.fontSize);
   updateAlignButtons();
   updateColorButtons();
+  updateQrControls();
   
   // The name preview will be updated once the template image is loaded
   // by the onTemplateRenderComplete function.
@@ -855,14 +1016,21 @@ async function savePlacement() {
       canvas_height: placementData.canvasHeight,
       text_font_size: placementData.fontSize,
       text_align: placementData.align,
-      text_color_hex: placementData.color
+      text_color_hex: placementData.color,
+      // QR code positioning data
+      qr_x_ratio: qrData.enabled ? qrData.x : null,
+      qr_y_ratio: qrData.enabled ? qrData.y : null,
+      qr_size: qrData.enabled ? qrData.size : null,
     };
     
     console.log('=== SAVING PLACEMENT ===');
     console.log('Current template ID:', currentTemplate.id);
     console.log('Current template name:', currentTemplate.original_name);
     console.log('Placement data being saved:', saveData);
+    console.log('QR Data:', qrData);
     console.log('Raw placementData object:', placementData);
+    console.log('QR enabled:', qrData.enabled);
+    console.log('QR position being saved:', { x: qrData.x, y: qrData.y, size: qrData.size });
     
     // Also show what this should look like in PDF
     const expectedPdfX = 600 * placementData.x; // Assuming 600px wide PDF
@@ -953,25 +1121,25 @@ function handleCanvasClick(event) {
   const xCss = event.clientX - canvasRect.left;
   const yCss = event.clientY - canvasRect.top;
 
-  // Store raw pixel coordinates and canvas dimensions
-  placementData.pixelX = xCss;
-  placementData.pixelY = yCss;
-  placementData.canvasWidth = displayedWidth;
-  placementData.canvasHeight = displayedHeight;
-
-  // Update the ratios for preview purposes only
-  placementData.x = clamp01(xCss / displayedWidth);
-  placementData.y = clamp01(yCss / displayedHeight);
-
-  console.log('CLICK CAPTURED:', {
-    pixelCoords: { x: xCss, y: yCss },
-    canvasSize: {
-      intrinsic: { width: templateCanvas.width, height: templateCanvas.height },
-      displayed: { width: displayedWidth, height: displayedHeight },
-    },
-  });
-
-  updateNamePreview();
+  // Check if QR mode is enabled
+  if (qrData.enabled) {
+    // Position QR code
+    qrData.x = xCss / displayedWidth;
+    qrData.y = yCss / displayedHeight;
+    updateQrPosition(qrData.x, qrData.y);
+    updateQrPreview();
+    console.log('QR POSITION CAPTURED:', { x: qrData.x, y: qrData.y });
+  } else {
+    // Position text (existing functionality)
+    setPlacementFromTopLeft(xCss, yCss);
+    console.log('TEXT POSITION CAPTURED:', {
+      pixelCoords: { x: xCss, y: yCss },
+      canvasSize: {
+        intrinsic: { width: templateCanvas.width, height: templateCanvas.height },
+        displayed: { width: displayedWidth, height: displayedHeight },
+      },
+    });
+  }
 }
 
 function getPreviewTopLeft() {
@@ -1245,6 +1413,27 @@ function capturePlacementDiagnostics() {
   };
   console.log('PLACEMENT DIAGNOSTICS', diagnostics);
   return diagnostics;
+}
+
+// QR Code Control Event Listeners
+if (enableQrCheckbox) {
+  enableQrCheckbox.addEventListener('change', (event) => {
+    qrData.enabled = event.target.checked;
+    updateQrControls();
+    if (qrData.enabled) {
+      updateQrPreview();
+    }
+  });
+}
+
+if (qrSizeInput) {
+  qrSizeInput.addEventListener('input', (event) => {
+    qrData.size = Number(event.target.value);
+    updateQrControls();
+    if (qrData.enabled) {
+      updateQrPreview();
+    }
+  });
 }
 
 window.capturePlacementDiagnostics = capturePlacementDiagnostics;

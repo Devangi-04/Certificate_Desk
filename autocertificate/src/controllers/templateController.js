@@ -33,7 +33,14 @@ async function updatePlacement(req, res) {
   if (!templateId) {
     throw new Error('templateId is required');
   }
+  
+  console.log('=== TEMPLATE CONTROLLER: UPDATE PLACEMENT ===');
+  console.log('Template ID:', templateId);
+  console.log('Request body:', req.body);
+  
   const template = await updateTemplatePlacement(templateId, req.body || {});
+  console.log('Controller received updated template:', template);
+  
   return success(res, { template });
 }
 

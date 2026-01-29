@@ -7,6 +7,7 @@ const {
 const { getTemplateById } = require('./templateService');
 const { listParticipants, getParticipantsByIds } = require('./participantService');
 const { sendCertificateEmail } = require('./emailService');
+const { generateCertificateQRCode, generateQRCodeDataURL, updateCertificateWithQRCode } = require('./qrCodeService');
 
 function parseColor(hex = '#000000') {
   if (!hex || typeof hex !== 'string') return { r: 0, g: 0, b: 0 };
@@ -98,19 +99,39 @@ async function ensureCertificateRecord(participantId, templateId) {
   if (rows.length) {
     return rows[0];
   }
-  const [inserted] = await query(
-    `INSERT INTO certificates (participant_id, template_id, status)
-     VALUES ($1,$2,$3)
-     RETURNING *`,
-    [participantId, templateId, 'pending']
+  
+  // Generate certificate number and year
+  const currentYear = new Date().getFullYear();
+  const [yearResult] = await query(
+    'SELECT COALESCE(MAX(CAST(certificate_number AS INTEGER)), 0) + 1 as next_number FROM certificates WHERE certificate_year = $1',
+    [currentYear]
   );
-  return inserted;
+  const certificateNumber = yearResult.next_number;
+  const certificateFullId = `CD/${currentYear}/${String(certificateNumber).padStart(6, '0')}`;
+  
+  const [inserted] = await query(
+    `INSERT INTO certificates (participant_id, template_id, status, certificate_number, certificate_year, certificate_full_id)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     RETURNING *`,
+    [participantId, templateId, 'pending', Number(certificateNumber), currentYear, `CD/${currentYear}/temp`]
+  );
+  
+  // Update certificate_full_id with the actual database ID
+  const [updated] = await query(
+    'UPDATE certificates SET certificate_full_id = $1 WHERE id = $2 RETURNING *',
+    [`CD/${currentYear}/${inserted.id}`, inserted.id]
+  );
+  return updated;
 }
 
 async function listCertificates(filters = {}) {
-  const { templateId = null, participantIds = null, deliveryStatus = null } = filters;
+  const { templateId = null, participantIds = null, deliveryStatus = null, includeHidden = false } = filters;
   const conditions = ['c.deleted_at IS NULL'];
   const params = [];
+
+  if (!includeHidden) {
+    conditions.push('c.is_visible = TRUE');
+  }
 
   if (templateId) {
     params.push(Number(templateId));
@@ -129,18 +150,21 @@ async function listCertificates(filters = {}) {
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+  // Add filter to exclude archived templates from UI lists
+  const finalWhereClause = whereClause ? `${whereClause} AND t.is_archived = FALSE` : 'WHERE t.is_archived = FALSE';
+
   return query(
     `SELECT c.*, p.full_name, p.email, t.original_name AS template_name
      FROM certificates c
      JOIN participants p ON p.id = c.participant_id
      JOIN templates t ON t.id = c.template_id
-     ${whereClause}
+     ${finalWhereClause}
      ORDER BY c.updated_at DESC`,
     params
   );
 }
 
-async function generateCertificates({ templateId, participantIds = [], sendEmail = false, eventName }) {
+async function generateCertificates({ templateId, participantIds = [], sendEmail = false, eventName, req = null }) {
   if (!templateId) {
     throw new Error('templateId is required');
   }
@@ -250,6 +274,36 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
         `Name positioned at: x=${drawX.toFixed(2)}, y=${drawY.toFixed(2)}, align=${textAlign}`
       );
 
+      // Generate QR code for embedding in PDF
+      const baseUrl = `${req?.protocol}://${req?.get('host')}` || process.env.BASE_URL || 'http://localhost:4000';
+      const verificationUrl = `${baseUrl}/verify.html?id=${certificateRecord.id}`;
+      const qrCodeDataURL = await generateQRCodeDataURL(certificateRecord.id, baseUrl);
+      
+      // Embed QR code in PDF if template has positioning
+      if (template.qr_x_ratio !== null && template.qr_y_ratio !== null) {
+        const qrSize = template.qr_size || 80; // Default QR code size
+        const qrX = pageWidth * (template.qr_x_ratio || 0.85); // Default to right side
+        const qrY = pageHeight * (template.qr_y_ratio || 0.15); // Default to top
+        
+        // Convert QR data URL to image bytes
+        const qrBase64 = qrCodeDataURL.replace(/^data:image\/png;base64,/, '');
+        const qrImageBytes = Buffer.from(qrBase64, 'base64');
+        
+        // Embed QR code image in PDF
+        const qrImage = await pdfDoc.embedPng(qrImageBytes);
+        const qrImageDims = qrImage.scale(qrSize / Math.max(qrImage.width, qrImage.height));
+        
+        // Draw QR code on PDF
+        page.drawImage(qrImage, {
+          x: qrX - qrImageDims.width / 2,
+          y: pageHeight - qrY - qrImageDims.height / 2,
+          width: qrImageDims.width,
+          height: qrImageDims.height,
+        });
+        
+        console.log(`QR code embedded at: x=${qrX.toFixed(2)}, y=${qrY.toFixed(2)}, size=${qrSize}`);
+      }
+
       page.drawText(text, {
         x: drawX,
         y: drawY,
@@ -288,6 +342,21 @@ async function generateCertificates({ templateId, participantIds = [], sendEmail
         status: 'generated',
         pdf_path: storedPath,
       };
+
+      // Generate QR code file for separate access and update database
+      try {
+        const { qrCodePath, verificationUrl: fileVerificationUrl } = await generateCertificateQRCode(record.id, baseUrl);
+        await updateCertificateWithQRCode(record.id, qrCodePath, fileVerificationUrl);
+        
+        // Update record with QR code info
+        record.qr_code_path = qrCodePath;
+        record.verification_url = fileVerificationUrl;
+        
+        console.log(`QR code generated for certificate ${record.id}: ${fileVerificationUrl}`);
+      } catch (qrError) {
+        console.error('Failed to generate QR code for certificate:', record.id, qrError);
+        // Don't fail the entire process if QR generation fails
+      }
 
       summary.generated += 1;
 
@@ -368,13 +437,81 @@ async function sendCertificateById(certificateId, options = {}) {
   }
 }
 
-async function getCertificateById(certificateId) {
+async function getCertificateById(certificateId, includeHidden = false) {
+  const conditions = ['c.id = $1', 'c.deleted_at IS NULL'];
+  const params = [certificateId];
+  
+  if (!includeHidden) {
+    conditions.push('c.is_visible = TRUE');
+  }
+  
   const [certificate] = await query(
     `SELECT c.*, p.full_name, p.email, t.original_name as template_name
      FROM certificates c
      JOIN participants p ON c.participant_id = p.id
      JOIN templates t ON c.template_id = t.id
-     WHERE c.id = $1`,
+     WHERE ${conditions.join(' AND ')}`,
+    params
+  );
+  return certificate;
+}
+
+async function getCertificateQRCode(certificateId) {
+  const [certificate] = await query(
+    `SELECT qr_code_path, verification_url, deleted_at
+     FROM certificates 
+     WHERE id = $1 AND deleted_at IS NULL`,
+    [certificateId]
+  );
+  
+  if (!certificate || !certificate.qr_code_path) {
+    throw new Error('QR code not found for this certificate');
+  }
+  
+  return certificate;
+}
+
+async function hideCertificate(certificateId) {
+  const [updated] = await query(
+    `UPDATE certificates 
+     SET is_visible = FALSE, updated_at = NOW() 
+     WHERE id = $1 AND deleted_at IS NULL 
+     RETURNING *`,
+    [certificateId]
+  );
+  return updated;
+}
+
+async function unhideCertificate(certificateId) {
+  const [updated] = await query(
+    `UPDATE certificates 
+     SET is_visible = TRUE, updated_at = NOW() 
+     WHERE id = $1 AND deleted_at IS NULL 
+     RETURNING *`,
+    [certificateId]
+  );
+  return updated;
+}
+
+async function softDeleteCertificate(certificateId) {
+  const [updated] = await query(
+    `UPDATE certificates 
+     SET deleted_at = NOW(), is_visible = FALSE, updated_at = NOW() 
+     WHERE id = $1 
+     RETURNING *`,
+    [certificateId]
+  );
+  return updated;
+}
+
+async function getCertificateByIdForVerification(certificateId) {
+  // For QR verification, we ignore visibility but respect soft delete
+  const [certificate] = await query(
+    `SELECT c.*, p.full_name, p.email, t.original_name as template_name
+     FROM certificates c
+     JOIN participants p ON c.participant_id = p.id
+     JOIN templates t ON c.template_id = t.id
+     WHERE c.id = $1 AND c.deleted_at IS NULL`,
     [certificateId]
   );
   return certificate;
@@ -385,4 +522,9 @@ module.exports = {
   generateCertificates,
   sendCertificateById,
   getCertificateById,
+  hideCertificate,
+  unhideCertificate,
+  softDeleteCertificate,
+  getCertificateByIdForVerification,
+  getCertificateQRCode,
 };

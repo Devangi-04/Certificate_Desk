@@ -131,9 +131,13 @@
                   <th>Name</th>
                   <th>Email</th>
                   <th>Template</th>
+                  <th>Certificate ID</th>
                   <th>PDF</th>
                   <th>Generation</th>
                   <th>Delivery</th>
+                  <th>Visibility</th>
+                  <th>QR Code</th>
+                  <th>Verification</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -165,6 +169,7 @@
             <div class="canvas-container">
               <canvas id="template-canvas"></canvas>
               <div class="name-preview" id="name-preview">John Doe</div>
+              <div class="qr-preview" id="qr-preview" style="display: none;">QR</div>
             </div>
             <div class="placement-controls">
               <label class="font-size-control">
@@ -210,7 +215,31 @@
                   </button>
                 </div>
               </div>
-              <p class="placement-hint"><b>Click directly on the template</b> where you want the top-left corner of the name to appear. Use the arrow keys for fine-tuning.</p>
+              <div class="qr-group">
+                <span>QR Code Position</span>
+                <div class="qr-controls">
+                  <label class="checkbox">
+                    <input type="checkbox" id="enable-qr" />
+                    <span>Enable QR Code on Certificate</span>
+                  </label>
+                  <div id="qr-position-controls" style="display: none;">
+                    <label>
+                      <span>QR Size</span>
+                      <input type="number" id="qr-size" min="40" max="200" value="80" />
+                      <span>pixels</span>
+                    </label>
+                    <div class="qr-position-info">
+                      <span>Click on template to position QR code</span>
+                      <div class="qr-position-badge" id="qr-position-badge">Not positioned</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="placement-hint">
+                <strong>Text Mode (QR Disabled):</strong> Click to position participant name<br>
+                <strong>QR Mode (QR Enabled):</strong> Click to position QR code<br>
+                Use arrow keys for fine-tuning text position.
+              </p>
               <div class="placement-actions">
                 <button class="secondary danger" id="reset-placement">Reset & Center</button>
                 <button class="primary" id="save-placement">Save Placement</button>

@@ -38,30 +38,50 @@ async function saveTemplateFile(file) {
   return formatTemplate(template);
 }
 
-async function listTemplates() {
-  const rows = await query('SELECT * FROM templates ORDER BY uploaded_at DESC');
+async function listTemplates({ includeArchived = false } = {}) {
+  const conditions = [];
+  if (!includeArchived) {
+    conditions.push('is_archived = FALSE');
+  }
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const rows = await query(`SELECT * FROM templates ${whereClause} ORDER BY uploaded_at DESC`);
   return rows.map(formatTemplate);
 }
 
-async function getTemplateById(templateId) {
-  const rows = await query('SELECT * FROM templates WHERE id = $1', [templateId]);
+async function getTemplateById(templateId, { includeArchived = false } = {}) {
+  const params = [templateId];
+  const conditions = ['id = $1'];
+  if (!includeArchived) {
+    conditions.push('is_archived = FALSE');
+  }
+  const rows = await query(`SELECT * FROM templates WHERE ${conditions.join(' AND ')}`, params);
   return formatTemplate(rows[0]);
 }
 
-async function deleteTemplate(templateId) {
-  const template = await getTemplateById(templateId);
+async function deleteTemplate(templateId, { hardDelete = false } = {}) {
+  const template = await getTemplateById(templateId, { includeArchived: true });
   if (!template) {
     const error = new Error('Template not found');
     error.status = 404;
     throw error;
   }
 
-  if (template.stored_path) {
-    await deleteFromStorage(template.stored_path);
+  if (hardDelete) {
+    if (template.stored_path) {
+      await deleteFromStorage(template.stored_path);
+    }
+    await query('DELETE FROM templates WHERE id = $1', [templateId]);
+    return { id: templateId, archived: false, deleted: true };
   }
 
-  await query('DELETE FROM templates WHERE id = $1', [templateId]);
-  return { id: templateId };
+  await query(
+    `UPDATE templates 
+     SET is_archived = TRUE, archived_at = NOW(), updated_at = NOW() 
+     WHERE id = $1`,
+    [templateId]
+  );
+
+  return { id: templateId, archived: true };
 }
 
 function normalizeHexColor(value) {
@@ -83,8 +103,16 @@ async function updateTemplatePlacement(
     text_font_size,
     text_align,
     text_color_hex,
+    qr_x_ratio,
+    qr_y_ratio,
+    qr_size,
   }
 ) {
+  console.log('=== TEMPLATE SERVICE: UPDATE PLACEMENT ===');
+  console.log('Template ID:', templateId);
+  console.log('Received QR data:', { qr_x_ratio, qr_y_ratio, qr_size });
+  console.log('All received data:', arguments[1]);
+  
   const template = await getTemplateById(templateId);
   if (!template) {
     const error = new Error('Template not found');
@@ -105,13 +133,21 @@ async function updateTemplatePlacement(
   }
 
   const normalizedColor = normalizeHexColor(text_color_hex);
+  
+  // Normalize QR code positioning
+  const normalizedQrX = qr_x_ratio !== undefined ? Number(qr_x_ratio) : null;
+  const normalizedQrY = qr_y_ratio !== undefined ? Number(qr_y_ratio) : null;
+  const normalizedQrSize = qr_size ? Number(qr_size) : null;
+
+  console.log('Normalized QR data:', { normalizedQrX, normalizedQrY, normalizedQrSize });
 
   // Update template positioning data in database
   await query(
     `UPDATE templates
      SET text_x_ratio = $1, text_y_ratio = $2, text_font_size = $3, text_align = $4, text_color_hex = $5,
-         text_x_pixels = $6, text_y_pixels = $7, canvas_width = $8, canvas_height = $9
-     WHERE id = $10`,
+         text_x_pixels = $6, text_y_pixels = $7, canvas_width = $8, canvas_height = $9,
+         qr_x_ratio = $10, qr_y_ratio = $11, qr_size = $12
+     WHERE id = $13`,
     [
       normalizedX,
       normalizedY,
@@ -122,11 +158,21 @@ async function updateTemplatePlacement(
       text_y_pixels ?? null,
       canvas_width ?? null,
       canvas_height ?? null,
+      normalizedQrX,
+      normalizedQrY,
+      normalizedQrSize,
       templateId,
     ]
   );
   
-  return getTemplateById(templateId);
+  const updatedTemplate = await getTemplateById(templateId);
+  console.log('Updated template QR data:', {
+    qr_x_ratio: updatedTemplate.qr_x_ratio,
+    qr_y_ratio: updatedTemplate.qr_y_ratio,
+    qr_size: updatedTemplate.qr_size
+  });
+  
+  return updatedTemplate;
 }
 
 module.exports = {
