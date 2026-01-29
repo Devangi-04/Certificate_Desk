@@ -216,30 +216,74 @@
                 </div>
               </div>
               <div class="qr-group">
-                <span>QR Code Position</span>
-                <div class="qr-controls">
-                  <label class="checkbox">
-                    <input type="checkbox" id="enable-qr" />
-                    <span>Enable QR Code on Certificate</span>
-                  </label>
-                  <div id="qr-position-controls" style="display: none;">
-                    <label>
-                      <span>QR Size</span>
-                      <input type="number" id="qr-size" min="40" max="200" value="80" />
-                      <span>pixels</span>
+                <div class="qr-section-header">
+                  <div class="qr-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="7" height="7"/>
+                      <rect x="14" y="3" width="7" height="7"/>
+                      <rect x="14" y="14" width="7" height="7"/>
+                      <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    <span>QR Code Setup</span>
+                  </div>
+                  <div class="qr-toggle">
+                    <label class="switch">
+                      <input type="checkbox" id="enable-qr">
+                      <span class="slider"></span>
                     </label>
-                    <div class="qr-position-info">
-                      <span>Click on template to position QR code</span>
-                      <div class="qr-position-badge" id="qr-position-badge">Not positioned</div>
+                    <span class="toggle-label">Add QR Code</span>
+                  </div>
+                </div>
+                
+                <div id="qr-position-controls" class="qr-controls-panel" style="display: none;">
+                  <div class="qr-size-section">
+                    <div class="section-label">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                      </svg>
+                      <span>QR Code Size</span>
+                    </div>
+                    <div class="size-slider-container">
+                      <input type="range" id="qr-size-slider" min="40" max="200" value="80" class="size-slider">
+                      <div class="size-display">
+                        <span id="qr-size-value">80</span>
+                        <span class="size-unit">px</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="qr-position-section">
+                    <div class="section-label">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                      </svg><br><br>
+                      <span>Position QR Code</span>
+                    </div>
+                    <div class="position-instruction-box">
+                      <div class="instruction-content">
+                        <div class="instruction-icon">👆</div>
+                        <div class="instruction-text">
+                          <strong>Click anywhere on the certificate</strong><br>
+                          <span class="instruction-subtitle">to place the QR code at that exact position</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="position-result">
+                      <div class="position-coordinates" id="qr-position-badge">
+                        <div class="coord-item">
+                          <span class="coord-label">X:</span>
+                          <span class="coord-value">--</span>
+                        </div>
+                        <div class="coord-item">
+                          <span class="coord-label">Y:</span>
+                          <span class="coord-value">--</span>
+                        </div>
+                      </div>
+                      <div class="position-hint" id="position-hint">Ready to position</div>
                     </div>
                   </div>
                 </div>
               </div>
-              <p class="placement-hint">
-                <strong>Text Mode (QR Disabled):</strong> Click to position participant name<br>
-                <strong>QR Mode (QR Enabled):</strong> Click to position QR code<br>
-                Use arrow keys for fine-tuning text position.
-              </p>
               <div class="placement-actions">
                 <button class="secondary danger" id="reset-placement">Reset & Center</button>
                 <button class="primary" id="save-placement">Save Placement</button>

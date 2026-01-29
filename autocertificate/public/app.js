@@ -30,6 +30,7 @@ const colorToggle = document.getElementById('color-toggle');
 const enableQrCheckbox = document.getElementById('enable-qr');
 const qrPositionControls = document.getElementById('qr-position-controls');
 const qrSizeInput = document.getElementById('qr-size');
+const qrSizeSlider = document.getElementById('qr-size-slider');
 const qrPositionBadge = document.getElementById('qr-position-badge');
 const qrPreview = document.getElementById('qr-preview');
 
@@ -735,17 +736,40 @@ function updateQrControls() {
     qrPreview.style.display = qrData.enabled ? 'block' : 'none';
   }
   
-  // Update QR size input
+  // Update QR size input and slider
   if (qrSizeInput) {
     qrSizeInput.value = qrData.size;
   }
   
-  // Update QR position badge
+  // Update new slider if exists
+  const qrSizeSlider = document.getElementById('qr-size-slider');
+  const qrSizeValue = document.getElementById('qr-size-value');
+  if (qrSizeSlider && qrSizeValue) {
+    qrSizeSlider.value = qrData.size;
+    qrSizeValue.textContent = qrData.size;
+  }
+  
+  // Update QR position badge with new structure
   if (qrPositionBadge) {
-    if (qrData.enabled) {
-      qrPositionBadge.textContent = `X ${Math.round(qrData.x * 100)}% · Y ${Math.round(qrData.y * 100)}%`;
-    } else {
-      qrPositionBadge.textContent = 'Not positioned';
+    const coordValues = qrPositionBadge.querySelectorAll('.coord-value');
+    if (qrData.enabled && coordValues.length >= 2) {
+      coordValues[0].textContent = Math.round(qrData.x * 100) + '%';
+      coordValues[1].textContent = Math.round(qrData.y * 100) + '%';
+      
+      // Update position hint
+      const positionHint = document.getElementById('position-hint');
+      if (positionHint) {
+        positionHint.textContent = 'QR positioned successfully';
+      }
+    } else if (coordValues.length >= 2) {
+      coordValues[0].textContent = '--';
+      coordValues[1].textContent = '--';
+      
+      // Update position hint
+      const positionHint = document.getElementById('position-hint');
+      if (positionHint) {
+        positionHint.textContent = 'Ready to position';
+      }
     }
   }
 }
@@ -1428,6 +1452,17 @@ if (enableQrCheckbox) {
 
 if (qrSizeInput) {
   qrSizeInput.addEventListener('input', (event) => {
+    qrData.size = Number(event.target.value);
+    updateQrControls();
+    if (qrData.enabled) {
+      updateQrPreview();
+    }
+  });
+}
+
+// Add event listener for QR size slider
+if (qrSizeSlider) {
+  qrSizeSlider.addEventListener('input', (event) => {
     qrData.size = Number(event.target.value);
     updateQrControls();
     if (qrData.enabled) {
