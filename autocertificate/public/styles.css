@@ -38,6 +38,12 @@ body {
     padding: 1rem 0.5rem 2rem;
   }
   
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  
   .hero {
     grid-template-columns: 1fr;
     gap: 1rem;
@@ -97,17 +103,30 @@ body {
   
   .panel {
     padding: 1.25rem;
+    width: 100%;
   }
   
   .panel header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+    width: 100%;
   }
   
   .panel-actions {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  
+  .panel-actions button,
+  .panel header > .ghost {
+    flex: 1 1 48%;
+  }
+  
+  .panel form button,
+  .dropzone button {
+    width: 100%;
   }
   
   .dropzone {
@@ -116,6 +135,17 @@ body {
   
   .file-label {
     padding: 1.25rem;
+  }
+  
+  .list .item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .item-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 
@@ -187,6 +217,16 @@ body {
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
+  }
+  
+  .panel-actions button,
+  .panel header > .ghost {
+    width: 100%;
+  }
+  
+  .dropzone button,
+  .panel form button {
+    width: 100%;
   }
   
   .dropzone {
