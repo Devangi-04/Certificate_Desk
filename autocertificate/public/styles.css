@@ -94,6 +94,29 @@ body {
     text-align: center;
     min-width: 100px;
   }
+  
+  .panel {
+    padding: 1.25rem;
+  }
+  
+  .panel header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .panel-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .dropzone {
+    padding: 1rem;
+  }
+  
+  .file-label {
+    padding: 1.25rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -148,12 +171,30 @@ body {
   }
   
   .hero-stats span {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
   }
   
   .hero-stats p {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     margin: 0.25rem 0 0;
+  }
+  
+  .panel {
+    padding: 1rem;
+  }
+  
+  .panel-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  
+  .dropzone {
+    padding: 0.75rem;
+  }
+  
+  .file-label {
+    padding: 1rem;
   }
 }
 
