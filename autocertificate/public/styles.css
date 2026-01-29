@@ -104,9 +104,6 @@ body {
   .panel {
     padding: 1.25rem;
     width: 100%;
-  }
-  
-  .template-panel {
     max-width: 92vw;
     margin: 0 auto;
   }
@@ -216,9 +213,6 @@ body {
   
   .panel {
     padding: 1rem;
-  }
-  
-  .template-panel {
     max-width: 94vw;
     margin: 0 auto;
   }
